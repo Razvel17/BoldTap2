@@ -13,6 +13,7 @@ export interface AccountRecord {
   paymentStatus: PaymentStatus;
   acquiredService: ServiceId | null;
   nfcPublicSlug?: string;
+  loyaltyPublicSlug?: string;
 }
 
 export interface AdminUserRow {
@@ -22,6 +23,7 @@ export interface AdminUserRow {
   acquiredService: ServiceId | null;
   paymentStatus: PaymentStatus;
   nfcPublicSlug?: string;
+  loyaltyPublicSlug?: string;
 }
 
 function writeRawUsers(users: AccountRecord[]): void {
@@ -52,6 +54,7 @@ export function readRawUsers(): AccountRecord[] {
       acquiredService:
         u.acquiredService === undefined ? null : u.acquiredService,
       nfcPublicSlug: u.nfcPublicSlug,
+      loyaltyPublicSlug: u.loyaltyPublicSlug,
     };
     if (u.paymentStatus === undefined || u.acquiredService === undefined) {
       dirty = true;
@@ -68,6 +71,9 @@ export function listUsersForAdmin(): AdminUserRow[] {
     if (u.acquiredService === "nfc-business") {
       ensureNfcPublicSlug(u.id);
     }
+    if (u.acquiredService === "loyalty") {
+      ensureLoyaltyPublicSlug(u.id);
+    }
   }
   return readRawUsers().map((u) => ({
     id: u.id,
@@ -76,6 +82,7 @@ export function listUsersForAdmin(): AdminUserRow[] {
     acquiredService: u.acquiredService,
     paymentStatus: u.paymentStatus,
     nfcPublicSlug: u.nfcPublicSlug,
+    loyaltyPublicSlug: u.loyaltyPublicSlug,
   }));
 }
 
@@ -126,6 +133,27 @@ export function findUserIdByPublicSlug(slug: string): string | null {
   if (!slug) return null;
   const users = readRawUsers();
   const u = users.find((x) => x.nfcPublicSlug === slug);
+  return u?.id ?? null;
+}
+
+/** Loyalty program share links use a separate slug from NFC. */
+export function ensureLoyaltyPublicSlug(userId: string): string {
+  const users = readRawUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) return "";
+  let slug = users[idx].loyaltyPublicSlug;
+  if (!slug) {
+    slug = randomSlug();
+    users[idx] = { ...users[idx], loyaltyPublicSlug: slug };
+    writeRawUsers(users);
+  }
+  return slug;
+}
+
+export function findUserIdByLoyaltySlug(slug: string): string | null {
+  if (!slug) return null;
+  const users = readRawUsers();
+  const u = users.find((x) => x.loyaltyPublicSlug === slug);
   return u?.id ?? null;
 }
 

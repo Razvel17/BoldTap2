@@ -11,61 +11,40 @@ import {
   BarChart3,
   CreditCard,
   Settings,
-  Linkedin,
-  Instagram,
-  Facebook,
-  Twitter,
-  MessageCircle,
   Globe,
   Mail,
   Plus,
   Trash2,
   Link2,
-  Copy,
-  Check,
 } from "lucide-react";
 import {
   defaultNfcProfile,
   getNfcProfile,
   saveNfcProfile,
+  type NfcProfileData,
 } from "@/contexts/lib/nfcProfile";
-import { ensureNfcPublicSlug } from "@/contexts/lib/userRegistry";
+import NfcBusinessCardView from "@/components/NfcBusinessCardView";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
-  const [publicCardUrl, setPublicCardUrl] = useState("");
-  const [linkCopied, setLinkCopied] = useState(false);
   const [saveNotice, setSaveNotice] = useState(false);
   const [profileData, setProfileData] = useState({
     name: user?.name || "",
-    title: "Senior Developer",
-    company: "Tech Solutions Inc.",
+    title: "",
+    company: "",
     phones: user?.phone ? [user.phone] : [""],
     emails: user?.email ? [user.email] : [""],
-    website: "Add your website url",
-    socialLinks: [
-      {
-        id: "social-1",
-        label: "LinkedIn",
-        url:
-          user?.name
-            ? `https://linkedin.com/in/${user.name.toLowerCase().replace(/\s+/g, "")}`
-            : "",
-      },
-      {
-        id: "social-2",
-        label: "Instagram",
-        url: "",
-      },
-    ],
+    website: "",
+    about: "",
+    bannerImageUrl: "",
+    profileImageUrl: "",
+    socialLinks: [] as NfcProfileData["socialLinks"],
     profilePicture: null as null,
   });
 
   useEffect(() => {
     if (!user?.id) return;
-    const slug = ensureNfcPublicSlug(user.id);
-    setPublicCardUrl(`${window.location.origin}/c/${slug}`);
     const saved = getNfcProfile(user.id);
     const next =
       saved ??
@@ -74,33 +53,33 @@ export default function DashboardPage() {
         email: user.email,
         phone: user.phone,
       });
-    setProfileData({ ...next, profilePicture: null });
+    setProfileData({
+      ...next,
+      about: next.about ?? "",
+      bannerImageUrl: next.bannerImageUrl ?? "",
+      profileImageUrl: next.profileImageUrl ?? "",
+      profilePicture: null,
+    });
   }, [user?.id, user?.name, user?.email, user?.phone]);
+
+  const previewProfile = (): NfcProfileData => ({
+    name: profileData.name,
+    title: profileData.title,
+    company: profileData.company,
+    phones: profileData.phones,
+    emails: profileData.emails,
+    website: profileData.website,
+    socialLinks: profileData.socialLinks,
+    about: profileData.about || undefined,
+    bannerImageUrl: profileData.bannerImageUrl || undefined,
+    profileImageUrl: profileData.profileImageUrl || undefined,
+  });
 
   const handleSaveProfile = () => {
     if (!user?.id) return;
-    saveNfcProfile(user.id, {
-      name: profileData.name,
-      title: profileData.title,
-      company: profileData.company,
-      phones: profileData.phones,
-      emails: profileData.emails,
-      website: profileData.website,
-      socialLinks: profileData.socialLinks,
-    });
+    saveNfcProfile(user.id, previewProfile());
     setSaveNotice(true);
     window.setTimeout(() => setSaveNotice(false), 2500);
-  };
-
-  const copyPublicLink = async () => {
-    if (!publicCardUrl) return;
-    try {
-      await navigator.clipboard.writeText(publicCardUrl);
-      setLinkCopied(true);
-      window.setTimeout(() => setLinkCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,12 +87,40 @@ export default function DashboardPage() {
     setProfileData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const readImageFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("Failed to read image file"));
+      reader.readAsDataURL(file);
+    });
+
+  const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // Keep local demo size reasonable
+
+  const handleProfileImageFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Handle file upload logic here
-      console.log("File selected:", file);
+    if (!file) return;
+    if (file.size > MAX_IMAGE_BYTES) {
+      console.error("Profile image too large (max 2MB).");
+      return;
     }
+    const dataUrl = await readImageFileAsDataUrl(file);
+    setProfileData((prev) => ({ ...prev, profileImageUrl: dataUrl }));
+  };
+
+  const handleBannerImageFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_IMAGE_BYTES) {
+      console.error("Banner image too large (max 2MB).");
+      return;
+    }
+    const dataUrl = await readImageFileAsDataUrl(file);
+    setProfileData((prev) => ({ ...prev, bannerImageUrl: dataUrl }));
   };
 
   const handlePhoneChange = (index: number, value: string) => {
@@ -302,9 +309,16 @@ export default function DashboardPage() {
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={handleFileChange}
+                          onChange={handleProfileImageFileChange}
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
                         />
+                        {profileData.profileImageUrl ? (
+                          <img
+                            src={profileData.profileImageUrl}
+                            alt="Profile photo preview"
+                            className="mt-3 h-20 w-20 rounded-full border border-gray-200 object-cover"
+                          />
+                        ) : null}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -436,40 +450,68 @@ export default function DashboardPage() {
                           />
                         </div>
                       </div>
-                      {publicCardUrl ? (
-                        <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 space-y-3">
-                          <p className="text-sm font-semibold text-black">
-                            NFC &amp; public profile link
-                          </p>
-                          <p className="text-xs text-gray-600 leading-relaxed">
-                            Program your NFC tag with this URL. The address is
-                            unique to your account and only shows the profile
-                            you save here — not other users&apos; data.
-                          </p>
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                            <code className="text-xs bg-white border border-gray-200 rounded-lg px-3 py-2 break-all flex-1">
-                              {publicCardUrl}
-                            </code>
-                            <button
-                              type="button"
-                              onClick={copyPublicLink}
-                              className="inline-flex items-center justify-center space-x-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-white shrink-0"
-                            >
-                              {linkCopied ? (
-                                <>
-                                  <Check className="w-4 h-4 text-emerald-600" />
-                                  <span>Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-4 h-4" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          About
+                        </label>
+                        <textarea
+                          name="about"
+                          value={profileData.about}
+                          onChange={(e) =>
+                            setProfileData((prev) => ({
+                              ...prev,
+                              about: e.target.value,
+                            }))
+                          }
+                          rows={4}
+                          placeholder="Short bio (shown on your public card when saved)"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none resize-y"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Banner image URL
+                        </label>
+                        <input
+                          type="url"
+                          name="bannerImageUrl"
+                          value={profileData.bannerImageUrl}
+                          onChange={handleInputChange}
+                          placeholder="https://…"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                        />
+                        <div className="mt-3 space-y-2">
+                          <label className="block text-xs font-medium text-gray-600">
+                            Upload cover (local)
+                          </label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleBannerImageFileChange}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                          />
+                          {profileData.bannerImageUrl ? (
+                            <img
+                              src={profileData.bannerImageUrl}
+                              alt="Cover preview"
+                              className="h-24 w-full rounded-lg border border-gray-200 object-cover"
+                            />
+                          ) : null}
                         </div>
-                      ) : null}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Profile photo URL
+                        </label>
+                        <input
+                          type="url"
+                          name="profileImageUrl"
+                          value={profileData.profileImageUrl}
+                          onChange={handleInputChange}
+                          placeholder="https://…"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                        />
+                      </div>
 
                       <div className="space-y-3">
                         <label className="block text-sm font-medium text-gray-700">
@@ -549,54 +591,15 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Live Preview */}
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:p-8">
                     <h3 className="text-xl font-bold text-black mb-6">Live Preview</h3>
-                    <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl p-8 border border-gray-300">
-                      <div className="space-y-6">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-16 h-16 bg-black rounded-full flex items-center justify-center">
-                            <User className="w-8 h-8 text-white" />
-                          </div>
-                          <div>
-                            <h4 className="text-xl font-bold text-black">{profileData.name}</h4>
-                            <p className="text-gray-600">{profileData.title}</p>
-                            <p className="text-gray-500 text-sm">{profileData.company}</p>
-                          </div>
-                        </div>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex items-center space-x-2">
-                            <Mail className="w-4 h-4 text-gray-600" />
-                            <span className="text-gray-700">
-                              {profileData.emails[0] || "Add an email"}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <MessageCircle className="w-4 h-4 text-gray-600" />
-                            <span className="text-gray-700">
-                              {profileData.phones[0] || "Add a phone number"}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Globe className="w-4 h-4 text-gray-600" />
-                            <span className="text-gray-700">{profileData.website}</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-3 pt-4">
-                          {profileData.socialLinks.map((social) => (
-                            <span
-                              key={social.id}
-                              className="px-3 py-1 rounded-full bg-gray-200 text-xs font-medium text-gray-700"
-                            >
-                              {social.label}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="pt-4 border-t border-gray-300">
-                          <div className="w-full h-32 border-2 border-black rounded-lg flex items-center justify-center">
-                            <CreditCard className="w-12 h-12 text-black" />
-                          </div>
-                        </div>
-                      </div>
+                    <div className="rounded-xl bg-[#f0ebe8] p-4 sm:p-6">
+                      <NfcBusinessCardView
+                        profile={previewProfile()}
+                        fallbackName={user?.name ?? ""}
+                        fallbackEmail={user?.email ?? ""}
+                        showFooterCta={false}
+                      />
                     </div>
                   </div>
                 </motion.div>
@@ -637,51 +640,17 @@ export default function DashboardPage() {
                   className="bg-white rounded-xl shadow-sm border border-gray-200 p-8"
                 >
                   <h2 className="text-3xl font-bold text-black mb-6">Card Preview</h2>
-                  <div className="flex justify-center">
-                    <div className="w-full max-w-md bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl p-8 border border-gray-300">
-                      <div className="space-y-6">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-20 h-20 bg-black rounded-full flex items-center justify-center">
-                            <User className="w-10 h-10 text-white" />
-                          </div>
-                          <div>
-                            <h4 className="text-2xl font-bold text-black">{profileData.name}</h4>
-                            <p className="text-gray-600">{profileData.title}</p>
-                            <p className="text-gray-500">{profileData.company}</p>
-                          </div>
-                        </div>
-                        <div className="space-y-3 text-sm">
-                          <div className="flex items-center space-x-2">
-                            <Mail className="w-4 h-4 text-gray-600" />
-                            <span className="text-gray-700">
-                              {profileData.emails[0] || "Add an email"}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <MessageCircle className="w-4 h-4 text-gray-600" />
-                            <span className="text-gray-700">
-                              {profileData.phones[0] || "Add a phone number"}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Globe className="w-4 h-4 text-gray-600" />
-                            <span className="text-gray-700">{profileData.website}</span>
-                          </div>
-                        </div>
-                        <div className="flex justify-center space-x-4 pt-4">
-                          <Linkedin className="w-6 h-6 text-gray-600" />
-                          <Instagram className="w-6 h-6 text-gray-600" />
-                          <Facebook className="w-6 h-6 text-gray-600" />
-                          <Twitter className="w-6 h-6 text-gray-600" />
-                          <MessageCircle className="w-6 h-6 text-gray-600" />
-                        </div>
-                        <div className="pt-6 border-t border-gray-300">
-                          <div className="w-full h-40 border-2 border-black rounded-lg flex items-center justify-center">
-                            <CreditCard className="w-16 h-16 text-black" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  <p className="text-sm text-gray-600 mb-6 max-w-lg">
+                    This matches what visitors see when they open your digital
+                    card. Empty fields are hidden automatically.
+                  </p>
+                  <div className="flex justify-center rounded-xl bg-[#f0ebe8] p-6">
+                    <NfcBusinessCardView
+                      profile={previewProfile()}
+                      fallbackName={user?.name ?? ""}
+                      fallbackEmail={user?.email ?? ""}
+                      showFooterCta={false}
+                    />
                   </div>
                 </motion.div>
               )}

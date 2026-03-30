@@ -40,7 +40,7 @@ function paymentBadgeClass(s: PaymentStatus): string {
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [rows, setRows] = useState(listUsersForAdmin());
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null); // e.g. `${id}-nfc`
 
   const refresh = useCallback(() => {
     setRows(listUsersForAdmin());
@@ -53,11 +53,16 @@ export default function AdminDashboardPage() {
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
 
-  const copyLink = async (slug: string, userId: string) => {
-    const url = `${origin}/c/${slug}`;
+  const copyLink = async (
+    kind: "nfc" | "loyalty",
+    slug: string,
+    userId: string,
+  ) => {
+    const path = kind === "nfc" ? "c" : "l";
+    const url = `${origin}/${path}/${slug}`;
     try {
       await navigator.clipboard.writeText(url);
-      setCopiedId(userId);
+      setCopiedId(`${userId}-${kind}`);
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
       /* ignore */
@@ -118,7 +123,7 @@ export default function AdminDashboardPage() {
             <h1 className="text-3xl font-bold text-black mb-2">Accounts</h1>
             <p className="text-gray-600 mb-8">
               Registered users, chosen service, payment status, and NFC public
-              links (encode the URL on each customer&apos;s card).
+              links (NFC and loyalty) for encoding; not shown to end users.
             </p>
 
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -131,13 +136,14 @@ export default function AdminDashboardPage() {
                       <th className="px-4 py-3 font-semibold">Service</th>
                       <th className="px-4 py-3 font-semibold">Payment</th>
                       <th className="px-4 py-3 font-semibold">NFC public link</th>
+                      <th className="px-4 py-3 font-semibold">Loyalty share link</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {rows.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={6}
                           className="px-4 py-12 text-center text-gray-500"
                         >
                           No accounts yet. User data is stored in this
@@ -147,8 +153,11 @@ export default function AdminDashboardPage() {
                     ) : (
                       rows.map((u) => {
                         const isNfc = u.acquiredService === "nfc-business";
+                        const isLoyalty = u.acquiredService === "loyalty";
                         const slug = u.nfcPublicSlug ?? "";
-                        const showLink = isNfc && !!slug;
+                        const lslug = u.loyaltyPublicSlug ?? "";
+                        const showNfc = isNfc && !!slug;
+                        const showLoyalty = isLoyalty && !!lslug;
                         return (
                           <tr key={u.id} className="hover:bg-gray-50/80">
                             <td className="px-4 py-3 font-medium text-gray-900">
@@ -177,7 +186,7 @@ export default function AdminDashboardPage() {
                               </select>
                             </td>
                             <td className="px-4 py-3">
-                              {showLink ? (
+                              {showNfc ? (
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 max-w-md">
                                   <a
                                     href={`${origin}/c/${slug}`}
@@ -190,11 +199,11 @@ export default function AdminDashboardPage() {
                                   <div className="flex items-center gap-1 shrink-0">
                                     <button
                                       type="button"
-                                      onClick={() => copyLink(slug, u.id)}
+                                      onClick={() => copyLink("nfc", slug, u.id)}
                                       className="inline-flex items-center space-x-1 px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-100"
                                       title="Copy URL"
                                     >
-                                      {copiedId === u.id ? (
+                                      {copiedId === `${u.id}-nfc` ? (
                                         <Check className="w-3.5 h-3.5 text-emerald-600" />
                                       ) : (
                                         <Copy className="w-3.5 h-3.5" />
@@ -203,6 +212,48 @@ export default function AdminDashboardPage() {
                                     </button>
                                     <a
                                       href={`${origin}/c/${slug}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center p-1.5 rounded border border-gray-200 text-gray-700 hover:bg-gray-100"
+                                      title="Open"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5" />
+                                    </a>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {showLoyalty ? (
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 max-w-md">
+                                  <a
+                                    href={`${origin}/l/${lslug}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline truncate text-xs font-mono"
+                                  >
+                                    {`${origin}/l/${lslug}`}
+                                  </a>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        copyLink("loyalty", lslug, u.id)
+                                      }
+                                      className="inline-flex items-center space-x-1 px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-100"
+                                      title="Copy URL"
+                                    >
+                                      {copiedId === `${u.id}-loyalty` ? (
+                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3.5 h-3.5" />
+                                      )}
+                                      <span className="text-xs">Copy</span>
+                                    </button>
+                                    <a
+                                      href={`${origin}/l/${lslug}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="inline-flex items-center p-1.5 rounded border border-gray-200 text-gray-700 hover:bg-gray-100"

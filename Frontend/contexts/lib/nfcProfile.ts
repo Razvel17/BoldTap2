@@ -19,6 +19,12 @@ export interface NfcProfileData {
   emails: string[];
   website: string;
   socialLinks: NfcSocialLink[];
+  /** Shown in About section */
+  about?: string;
+  /** Full-width banner image URL or data URL */
+  bannerImageUrl?: string;
+  /** Circular avatar image URL or data URL */
+  profileImageUrl?: string;
 }
 
 export function defaultNfcProfile(user: {
@@ -28,21 +34,13 @@ export function defaultNfcProfile(user: {
 }): NfcProfileData {
   return {
     name: user.name || "",
-    title: "Senior Developer",
-    company: "Tech Solutions Inc.",
+    title: "",
+    company: "",
     phones: user.phone ? [user.phone] : [""],
     emails: user.email ? [user.email] : [""],
-    website: "Add your website url",
-    socialLinks: [
-      {
-        id: "social-1",
-        label: "LinkedIn",
-        url: user.name
-          ? `https://linkedin.com/in/${user.name.toLowerCase().replace(/\s+/g, "")}`
-          : "",
-      },
-      { id: "social-2", label: "Instagram", url: "" },
-    ],
+    website: "",
+    about: "",
+    socialLinks: [],
   };
 }
 

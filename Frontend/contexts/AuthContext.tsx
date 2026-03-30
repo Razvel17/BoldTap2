@@ -24,6 +24,7 @@ import {
 import {
   syncAcquiredService,
   ensureNfcPublicSlug,
+  ensureLoyaltyPublicSlug,
 } from "@/contexts/lib/userRegistry";
 
 interface AuthContextType {
@@ -71,6 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       syncAcquiredService(u.id, id);
       if (id === "nfc-business") {
         ensureNfcPublicSlug(u.id);
+      }
+      if (id === "loyalty") {
+        ensureLoyaltyPublicSlug(u.id);
       }
     }
   }, []);
