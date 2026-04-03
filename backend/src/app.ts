@@ -16,7 +16,7 @@ import {
   RATE_LIMIT_AUTH_MAX_REQUESTS,
 } from "./config/env";
 import { sendError } from "./utils/errors";
-import setupPassport from "./config/passport";
+import "./config/passport";
 
 // Routes
 import authRoutes from "./routes/authRoutes";
@@ -133,7 +133,6 @@ app.use(
 );
 
 // Passport middleware
-setupPassport;
 app.use(passport.initialize());
 app.use(passport.session());
 

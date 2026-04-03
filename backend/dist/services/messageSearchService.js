@@ -8,6 +8,7 @@ exports.searchByDateRange = searchByDateRange;
 exports.getRecentMessages = getRecentMessages;
 const database_1 = require("../config/database");
 const ChatMessage_1 = require("../entities/ChatMessage");
+const typeorm_1 = require("typeorm");
 const messageRepo = () => database_1.AppDataSource.getRepository(ChatMessage_1.ChatMessage);
 async function searchMessages(conversationId, query, page = 1, pageSize = 20) {
     const skip = (page - 1) * pageSize;
@@ -69,7 +70,7 @@ async function getRecentMessages(conversationId, limit = 50) {
         .find({
         where: {
             conversationId,
-            deletedAt: null,
+            deletedAt: (0, typeorm_1.IsNull)(),
         },
         order: { createdAt: "DESC" },
         take: limit,

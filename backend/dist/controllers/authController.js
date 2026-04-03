@@ -49,10 +49,12 @@ exports.resetPassword = resetPassword;
 exports.refresh = refresh;
 exports.googleCallback = googleCallback;
 exports.githubCallback = githubCallback;
+exports.oauthFailure = oauthFailure;
 const errors_1 = require("../utils/errors");
 const authService = __importStar(require("../services/authServices"));
 const tokenService = __importStar(require("../services/tokenService"));
 const oauthService = __importStar(require("../services/oauthService"));
+const env_1 = require("../config/env");
 // Register new user
 async function register(req, res) {
     try {
@@ -243,12 +245,13 @@ async function forgotPassword(req, res) {
         }
         const exists = await authService.emailExists(email);
         if (exists) {
-            // Find user by email (need to add this method)
-            // For now, just send success to prevent email enumeration
-            await tokenService.createVerificationToken("", // This needs fixing
-            "password_reset", 1);
-            // Uncomment when email service is ready
-            // const resetLink = `${FRONTEND_RESET_PASSWORD_URL}?token=${resetToken}`;
+            const user = await authService.getUserByEmail(email);
+            if (user) {
+                const resetToken = await tokenService.createVerificationToken(user.id, "password_reset", 1);
+                // Uncomment when email service is ready
+                // const resetLink = `${FRONTEND_RESET_PASSWORD_URL}?token=${resetToken}`;
+                void `${env_1.FRONTEND_RESET_PASSWORD_URL}?token=${resetToken}`;
+            }
             // await emailService.sendPasswordResetEmail(email, resetLink);
         }
         // Always return success for security
@@ -263,7 +266,8 @@ async function forgotPassword(req, res) {
 // Reset password with token
 async function resetPassword(req, res) {
     try {
-        const { token, newPassword } = req.body;
+        const token = req.params.token || req.body.token;
+        const { newPassword } = req.body;
         if (!token || !newPassword) {
             return (0, errors_1.sendError)(res, "Token and new password are required", 400);
         }
@@ -271,9 +275,7 @@ async function resetPassword(req, res) {
         if (!result) {
             return (0, errors_1.sendError)(res, "Invalid or expired reset token", 400);
         }
-        // Note: This will fail since changePassword expects oldPassword
-        // Need to add a separate resetPasswordDirect method to authService
-        const passwordReset = await authService.changePassword(result.userId, "", newPassword);
+        const passwordReset = await authService.resetPasswordDirect(result.userId, newPassword);
         if (!passwordReset.success) {
             return (0, errors_1.sendError)(res, passwordReset.error || "Password reset failed", 400);
         }
@@ -289,15 +291,14 @@ async function resetPassword(req, res) {
 async function refresh(req, res) {
     try {
         const { refreshToken } = req.body;
-        const userId = req.user?.userId;
-        if (!refreshToken || !userId) {
+        if (!refreshToken) {
             return (0, errors_1.sendError)(res, "Refresh token required", 401);
         }
-        const isValid = await tokenService.verifyRefreshToken(refreshToken, userId);
-        if (!isValid) {
+        const refreshTokenRecord = await tokenService.getRefreshTokenRecord(refreshToken);
+        if (!refreshTokenRecord) {
             return (0, errors_1.sendError)(res, "Invalid or expired refresh token", 401);
         }
-        const user = await authService.getUserById(userId);
+        const user = await authService.getUserById(refreshTokenRecord.userId);
         if (!user) {
             return (0, errors_1.sendError)(res, "User not found", 404);
         }
@@ -348,5 +349,12 @@ async function githubCallback(req, res) {
     catch (error) {
         return (0, errors_1.sendError)(res, error);
     }
+}
+async function oauthFailure(req, res) {
+    const provider = typeof req.query.provider === "string"
+        ? req.query.provider
+        : "oauth";
+    const frontendUrl = `${env_1.FRONTEND_URL}/auth/callback?error=${provider}_authentication_failed`;
+    return res.redirect(frontendUrl);
 }
 //# sourceMappingURL=authController.js.map

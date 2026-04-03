@@ -1,47 +1,41 @@
-import { MerchantSubscription } from "../entities/MerchantSubscription";
 import { CustomerPurchase } from "../entities/CustomerPurchase";
-interface CreateSubscriptionOptions {
-    merchantId: string;
-    priceId: string;
-    planName: "starter" | "pro" | "enterprise";
-}
-interface CreatePurchaseIntentOptions {
-    customerId: string;
-    productType: "nfc_card" | "ring" | "other";
+import { type MobileMoneyProviderName } from "./mobileMoneyProviders";
+interface InitiateCollectionOptions {
+    customerUserId: string;
+    provider: MobileMoneyProviderName;
+    phoneNumber: string;
     amount: number;
     currency?: string;
+    reference: string;
+    customerName?: string;
+    description?: string;
+    productType?: "nfc_card" | "ring" | "other";
 }
-/**
- * Create merchant subscription
- */
-export declare function createMerchantSubscription(options: CreateSubscriptionOptions): Promise<{
+export declare function getSupportedProviders(): ({
+    id: "mpesa";
+    name: string;
+    configured: boolean;
+} | {
+    id: "yas";
+    name: string;
+    configured: boolean;
+} | {
+    id: "airtel_money";
+    name: string;
+    configured: boolean;
+})[];
+export declare function initiateCollection(options: InitiateCollectionOptions): Promise<{
     success: boolean;
-    subscriptionId?: string;
+    paymentId?: string;
+    providerTransactionId?: string;
+    status?: "pending" | "succeeded" | "failed" | "cancelled";
     error?: string;
 }>;
-/**
- * Create payment intent for one-time purchase
- */
-export declare function createPaymentIntent(options: CreatePurchaseIntentOptions): Promise<{
-    success: boolean;
-    clientSecret?: string;
-    purchaseId?: string;
-    error?: string;
-}>;
-/**
- * Handle Stripe webhook events
- */
-export declare function handleStripeWebhook(event: any): Promise<{
-    success: boolean;
-    error?: string;
-}>;
-/**
- * Get merchant subscription
- */
-export declare function getMerchantSubscription(merchantId: string): Promise<MerchantSubscription | null>;
-/**
- * Get customer purchases
- */
+export declare function getPaymentStatus(paymentId: string, customerId?: string): Promise<CustomerPurchase | null>;
 export declare function getCustomerPurchases(customerId: string): Promise<CustomerPurchase[]>;
+export declare function handleProviderCallback(provider: MobileMoneyProviderName, payload: Record<string, unknown>): Promise<{
+    success: boolean;
+    error?: string;
+}>;
 export {};
 //# sourceMappingURL=paymentService.d.ts.map

@@ -12,6 +12,10 @@ import * as authService from "../services/authServices";
 import * as tokenService from "../services/tokenService";
 import * as oauthService from "../services/oauthService";
 import type { AuthenticatedRequest } from "../middleware/authMiddleware";
+import {
+  FRONTEND_RESET_PASSWORD_URL,
+  FRONTEND_URL,
+} from "../config/env";
 
 // Register new user
 export async function register(req: AuthenticatedRequest, res: Response) {
@@ -251,16 +255,20 @@ export async function forgotPassword(req: any, res: Response) {
     const exists = await authService.emailExists(email);
 
     if (exists) {
-      // Find user by email (need to add this method)
-      // For now, just send success to prevent email enumeration
-      await tokenService.createVerificationToken(
-        "", // This needs fixing
-        "password_reset",
-        1,
-      );
+      const user = await authService.getUserByEmail(email);
 
-      // Uncomment when email service is ready
-      // const resetLink = `${FRONTEND_RESET_PASSWORD_URL}?token=${resetToken}`;
+      if (user) {
+        const resetToken = await tokenService.createVerificationToken(
+          user.id,
+          "password_reset",
+          1,
+        );
+
+        // Uncomment when email service is ready
+        // const resetLink = `${FRONTEND_RESET_PASSWORD_URL}?token=${resetToken}`;
+        void `${FRONTEND_RESET_PASSWORD_URL}?token=${resetToken}`;
+      }
+
       // await emailService.sendPasswordResetEmail(email, resetLink);
     }
 
@@ -276,7 +284,8 @@ export async function forgotPassword(req: any, res: Response) {
 // Reset password with token
 export async function resetPassword(req: any, res: Response) {
   try {
-    const { token, newPassword } = req.body;
+    const token = req.params.token || req.body.token;
+    const { newPassword } = req.body;
 
     if (!token || !newPassword) {
       return sendError(res, "Token and new password are required", 400);
@@ -290,11 +299,8 @@ export async function resetPassword(req: any, res: Response) {
       return sendError(res, "Invalid or expired reset token", 400);
     }
 
-    // Note: This will fail since changePassword expects oldPassword
-    // Need to add a separate resetPasswordDirect method to authService
-    const passwordReset = await authService.changePassword(
+    const passwordReset = await authService.resetPasswordDirect(
       result.userId,
-      "",
       newPassword,
     );
 
@@ -314,18 +320,18 @@ export async function resetPassword(req: any, res: Response) {
 export async function refresh(req: any, res: Response) {
   try {
     const { refreshToken } = req.body;
-    const userId = req.user?.userId;
 
-    if (!refreshToken || !userId) {
+    if (!refreshToken) {
       return sendError(res, "Refresh token required", 401);
     }
 
-    const isValid = await tokenService.verifyRefreshToken(refreshToken, userId);
-    if (!isValid) {
+    const refreshTokenRecord =
+      await tokenService.getRefreshTokenRecord(refreshToken);
+    if (!refreshTokenRecord) {
       return sendError(res, "Invalid or expired refresh token", 401);
     }
 
-    const user = await authService.getUserById(userId);
+    const user = await authService.getUserById(refreshTokenRecord.userId);
     if (!user) {
       return sendError(res, "User not found", 404);
     }
@@ -381,4 +387,12 @@ export async function githubCallback(req: any, res: Response) {
   } catch (error) {
     return sendError(res, error as Error);
   }
+}
+
+export async function oauthFailure(req: any, res: Response) {
+  const provider = typeof req.query.provider === "string"
+    ? req.query.provider
+    : "oauth";
+  const frontendUrl = `${FRONTEND_URL}/auth/callback?error=${provider}_authentication_failed`;
+  return res.redirect(frontendUrl);
 }

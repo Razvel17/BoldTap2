@@ -77,6 +77,22 @@ export const STRIPE_PRICE_STARTER = process.env.STRIPE_PRICE_STARTER || "";
 export const STRIPE_PRICE_PRO = process.env.STRIPE_PRICE_PRO || "";
 export const STRIPE_PRICE_ENTERPRISE = process.env.STRIPE_PRICE_ENTERPRISE || "";
 
+// Mobile Money Provider Configuration
+export const MPESA_API_URL = process.env.MPESA_API_URL || "";
+export const MPESA_STATUS_URL = process.env.MPESA_STATUS_URL || "";
+export const MPESA_API_KEY = process.env.MPESA_API_KEY || "";
+export const MPESA_BUSINESS_ID = process.env.MPESA_BUSINESS_ID || "";
+
+export const YAS_API_URL = process.env.YAS_API_URL || "";
+export const YAS_STATUS_URL = process.env.YAS_STATUS_URL || "";
+export const YAS_API_KEY = process.env.YAS_API_KEY || "";
+export const YAS_BUSINESS_ID = process.env.YAS_BUSINESS_ID || "";
+
+export const AIRTEL_MONEY_API_URL = process.env.AIRTEL_MONEY_API_URL || "";
+export const AIRTEL_MONEY_STATUS_URL = process.env.AIRTEL_MONEY_STATUS_URL || "";
+export const AIRTEL_MONEY_API_KEY = process.env.AIRTEL_MONEY_API_KEY || "";
+export const AIRTEL_MONEY_BUSINESS_ID = process.env.AIRTEL_MONEY_BUSINESS_ID || "";
+
 // Rate limiting configuration
 export const RATE_LIMIT_WINDOW_MS = parseInt(
   process.env.RATE_LIMIT_WINDOW_MS || "900000", // 15 minutes
@@ -97,4 +113,3 @@ if (NODE_ENV === "production" && !process.env.JWT_SECRET) {
     "JWT_SECRET environment variable is required in production mode. Generate one: openssl rand -hex 64",
   );
 }
-

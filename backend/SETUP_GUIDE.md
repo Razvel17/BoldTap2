@@ -50,13 +50,26 @@ GOOGLE_CLIENT_SECRET=xxxx
 GITHUB_CLIENT_ID=xxxx
 GITHUB_CLIENT_SECRET=xxxx
 
-# Stripe
-STRIPE_SECRET_KEY=sk_test_xxxx
-STRIPE_PUBLISHABLE_KEY=pk_test_xxxx
-STRIPE_WEBHOOK_SECRET=whsec_xxxx
-
 # JWT
 JWT_SECRET=your-secret-key-here
+
+# Mobile Money - M-Pesa
+MPESA_API_URL=https://provider.example.com/collect
+MPESA_STATUS_URL=https://provider.example.com/status
+MPESA_API_KEY=xxxx
+MPESA_BUSINESS_ID=xxxx
+
+# Mobile Money - Yas / Mixx
+YAS_API_URL=https://provider.example.com/collect
+YAS_STATUS_URL=https://provider.example.com/status
+YAS_API_KEY=xxxx
+YAS_BUSINESS_ID=xxxx
+
+# Mobile Money - Airtel Money
+AIRTEL_MONEY_API_URL=https://provider.example.com/collect
+AIRTEL_MONEY_STATUS_URL=https://provider.example.com/status
+AIRTEL_MONEY_API_KEY=xxxx
+AIRTEL_MONEY_BUSINESS_ID=xxxx
 ```
 
 ### 4. Get External API Keys
@@ -73,10 +86,11 @@ JWT_SECRET=your-secret-key-here
 - https://github.com/settings/developers → OAuth Apps → New
 - Add redirect: `http://localhost:3001/auth/github/callback`
 
-#### Stripe
-- https://dashboard.stripe.com/api/keys
-- Use test keys (start with `sk_test_`)
-- Create subscription plans for Starter ($10/mo) & Pro ($50/mo)
+#### Mobile Money Providers
+- M-Pesa: get merchant/business credentials, collection endpoint, callback contract, and status query details
+- Yas / Mixx: get business portal/API credentials and callback contract
+- Airtel Money: get merchant/business credentials, collection endpoint, and transaction status contract
+- Set your callback URL to `/api/payments/webhook/:provider`
 
 ### 5. Run Database Migrations
 
@@ -121,24 +135,14 @@ Server starts at: `http://localhost:3001`
 
 ### Payment Routes (`/api/payments`)
 
-#### Merchant Subscriptions
 | Method | Path | Description | Auth Required |
 |--------|------|-------------|---|
-| GET | `/merchant/subscription/plans` | List subscription plans | ✅ |
-| POST | `/merchant/subscription/start` | Start subscription | ✅ |
-| GET | `/merchant/subscription/status` | Check subscription | ✅ |
-| POST | `/merchant/subscription/cancel` | Cancel subscription | ✅ |
-
-#### Customer Purchases
-| Method | Path | Description | Auth Required |
-|--------|------|-------------|---|
-| POST | `/customer/intent` | Create payment intent | ✅ |
+| GET | `/providers` | List supported mobile money providers | ✅ |
+| POST | `/collect` | Initiate a mobile money collection | ✅ |
+| GET | `/:paymentId/status` | Check one payment | ✅ |
 | GET | `/customer/history` | View purchase history | ✅ |
-
-#### Webhooks
-| Method | Path | Description | Auth Required |
-|--------|------|-------------|---|
-| POST | `/webhook/stripe` | Stripe webhook | ❌ |
+| POST | `/customer/intent` | Legacy alias for collection | ✅ |
+| POST | `/webhook/:provider` | Provider callback endpoint | ❌ |
 
 ---
 
@@ -181,10 +185,27 @@ curl -X POST http://localhost:3001/auth/refresh \
   }'
 ```
 
-### 4. Check Subscription Plans
+### 4. List Payment Providers
 ```bash
-curl -X GET http://localhost:3001/api/payments/merchant/subscription/plans \
+curl -X GET http://localhost:3001/api/payments/providers \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### 5. Initiate Mobile Money Collection
+```bash
+curl -X POST http://localhost:3001/api/payments/collect \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "mpesa",
+    "phoneNumber": "0712345678",
+    "amount": 1000,
+    "currency": "TZS",
+    "reference": "ORDER-1001",
+    "customerName": "John Doe",
+    "description": "BoldTap NFC card",
+    "productType": "nfc_card"
+  }'
 ```
 
 ---
@@ -210,18 +231,17 @@ curl -X GET http://localhost:3001/api/payments/merchant/subscription/plans \
 
 ## 💳 Payment System
 
-### Subscription Plans (Merchants)
+### Mobile Money Flow
 
-| Plan | Price | Businesses | Features |
-|------|-------|-----------|----------|
-| Free | $0 | 1 | Basic NFC cards, 100 customers |
-| Starter | $10/mo | 3 | Advanced analytics, 1000 customers |
-| Pro | $50/mo | 10 | Full features, unlimited customers, API access |
-| Enterprise | Custom | Unlimited | White-label, SLA, dedicated support |
+1. Frontend calls `POST /api/payments/collect`
+2. Backend creates a pending payment record
+3. Backend sends the collection request to M-Pesa, Yas, or Airtel Money
+4. Provider sends a callback to `/api/payments/webhook/:provider` or the frontend polls status
+5. Backend updates the payment to `succeeded`, `failed`, or `cancelled`
 
-### One-Time Purchases (Customers)
+### Current Limitation
 
-Customers can buy products (NFC cards, rings, etc.) with one-time payments via Stripe.
+Recurring subscriptions are not implemented for mobile money yet. The current backend supports one-time collection requests and provider callbacks.
 
 ---
 
@@ -234,7 +254,7 @@ Customers can buy products (NFC cards, rings, etc.) with one-time payments via S
 - password (hashed)
 - emailVerified (boolean)
 - userType (customer/merchant/both)
-- stripeCustomerId (optional)
+- stripeCustomerId (legacy optional field)
 - createdAt, updatedAt, deletedAt
 
 ### OAuth Accounts Table
@@ -246,8 +266,8 @@ Customers can buy products (NFC cards, rings, etc.) with one-time payments via S
 - **Verification Tokens**: For email verification & password reset
 
 ### Subscriptions & Purchases
-- Merchant subscriptions: Recurring billing
-- Customer purchases: One-time transactions
+- Merchant subscriptions: placeholder endpoints only for now
+- Customer purchases: mobile money transactions with provider callbacks
 
 ---
 

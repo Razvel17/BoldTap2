@@ -14,4 +14,5 @@ export declare function resetPassword(req: any, res: Response): Promise<Response
 export declare function refresh(req: any, res: Response): Promise<Response<any, Record<string, any>>>;
 export declare function googleCallback(req: any, res: Response): Promise<void | Response<any, Record<string, any>>>;
 export declare function githubCallback(req: any, res: Response): Promise<void | Response<any, Record<string, any>>>;
+export declare function oauthFailure(req: any, res: Response): Promise<void>;
 //# sourceMappingURL=authController.d.ts.map

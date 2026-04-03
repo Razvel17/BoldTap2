@@ -59,6 +59,26 @@ export async function verifyRefreshToken(token: string, userId: string): Promise
   return true;
 }
 
+export async function getRefreshTokenRecord(
+  token: string,
+): Promise<{ userId: string } | null> {
+  const tokenHash = hashToken(token);
+  const refreshToken = await refreshTokenRepo().findOne({
+    where: {
+      tokenHash,
+      revokedAt: IsNull(),
+    },
+  });
+
+  if (!refreshToken) return null;
+
+  if (new Date() > refreshToken.expiresAt) {
+    return null;
+  }
+
+  return { userId: refreshToken.userId };
+}
+
 // Revoke a refresh token (logout)
 export async function revokeRefreshToken(token: string, userId: string): Promise<boolean> {
   const tokenHash = hashToken(token);

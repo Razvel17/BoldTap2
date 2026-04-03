@@ -14,7 +14,7 @@ const express_session_1 = __importDefault(require("express-session"));
 const passport_1 = __importDefault(require("passport"));
 const env_1 = require("./config/env");
 const errors_1 = require("./utils/errors");
-const passport_2 = __importDefault(require("./config/passport"));
+require("./config/passport");
 // Routes
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const loyaltyCardRoutes_1 = __importDefault(require("./routes/loyaltyCardRoutes"));
@@ -110,7 +110,6 @@ app.use((0, express_session_1.default)({
     },
 }));
 // Passport middleware
-passport_2.default;
 app.use(passport_1.default.initialize());
 app.use(passport_1.default.session());
 // ============ REQUEST LOGGING (DEV ONLY) ============

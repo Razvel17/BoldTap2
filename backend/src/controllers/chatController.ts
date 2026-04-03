@@ -213,8 +213,7 @@ export async function addReaction(
   res: Response,
 ): Promise<Response | void> {
   try {
-    const { conversationId, messageId } = req.params as {
-      conversationId: string;
+    const { messageId } = req.params as {
       messageId: string;
     };
     const { emoji } = req.body;

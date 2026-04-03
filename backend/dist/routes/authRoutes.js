@@ -34,8 +34,12 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const passport_1 = __importDefault(require("passport"));
 const authController = __importStar(require("../controllers/authController"));
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const router = (0, express_1.Router)();
@@ -51,16 +55,17 @@ router.post("/verify-email/:token", authController.verifyEmail);
 router.post("/forgot-password", authController.forgotPassword);
 router.post("/reset-password/:token", authController.resetPassword);
 // OAuth endpoints
-router.get("/google", (_req, res) => {
-    // Passport will handle this
-    res.json({ message: "Start Google OAuth flow" });
-});
-router.get("/google/callback", authController.googleCallback);
-router.get("/github", (_req, res) => {
-    // Passport will handle this
-    res.json({ message: "Start GitHub OAuth flow" });
-});
-router.get("/github/callback", authController.githubCallback);
+router.get("/google", passport_1.default.authenticate("google", { scope: ["profile", "email"] }));
+router.get("/google/callback", passport_1.default.authenticate("google", {
+    session: false,
+    failureRedirect: "/auth/oauth/failure?provider=google",
+}), authController.googleCallback);
+router.get("/github", passport_1.default.authenticate("github", { scope: ["user:email"] }));
+router.get("/github/callback", passport_1.default.authenticate("github", {
+    session: false,
+    failureRedirect: "/auth/oauth/failure?provider=github",
+}), authController.githubCallback);
+router.get("/oauth/failure", authController.oauthFailure);
 // Protected endpoints (require authentication)
 router.get("/me", authMiddleware_1.authenticate, authController.getCurrentUser);
 router.get("/me/info", authMiddleware_1.authenticate, authController.getCurrentUserInfo);

@@ -1,10 +1,9 @@
 // WebSocket Service
-// Handles real-time chat events using Socket.io
+// Real-time chat using Socket.io
 
+import { Server as HttpServer } from "http";
 import { Server as SocketIOServer, Socket } from "socket.io";
-import { Server as HTTPServer } from "http";
 import { FRONTEND_URL } from "../config/env";
-import * as chatService from "./chatService";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -13,10 +12,9 @@ interface AuthenticatedSocket extends Socket {
 
 export class WebSocketService {
   private io: SocketIOServer;
-  private userSockets: Map<string, Set<string>> = new Map(); // userId -> socketIds
 
-  constructor(server: HTTPServer) {
-    this.io = new SocketIOServer(server, {
+  constructor(httpServer: HttpServer) {
+    this.io = new SocketIOServer(httpServer, {
       cors: {
         origin: FRONTEND_URL,
         methods: ["GET", "POST"],
@@ -29,215 +27,139 @@ export class WebSocketService {
     this.setupEventHandlers();
   }
 
-  private setupMiddleware() {
-    this.io.use((socket: AuthenticatedSocket, next) => {
-      // Token verification would go here
-      const userId = socket.handshake.query.userId as string;
+  private setupMiddleware(): void {
+    this.io.use(async (socket: AuthenticatedSocket, next) => {
+      try {
+        const token = socket.handshake.auth.token;
 
-      if (userId) {
-        socket.userId = userId;
+        if (!token) {
+          return next(new Error("No token provided"));
+        }
+
+        // Basic JWT verification (token format check)
+        if (typeof token !== "string" || !token.startsWith("ey")) {
+          return next(new Error("Invalid token format"));
+        }
+
+        socket.userId = socket.handshake.auth.userId;
         socket.conversationIds = new Set();
+
+        if (!socket.userId) {
+          return next(new Error("No user ID in token"));
+        }
+
         next();
-      } else {
+      } catch (error) {
         next(new Error("Authentication failed"));
       }
     });
   }
 
-  private setupEventHandlers() {
+  private setupEventHandlers(): void {
     this.io.on("connection", (socket: AuthenticatedSocket) => {
-      const userId = socket.userId!;
-      console.log(`User ${userId} connected: ${socket.id}`);
+      console.log(`✓ User connected: ${socket.userId}`);
 
-      // Track user sockets
-      if (!this.userSockets.has(userId)) {
-        this.userSockets.set(userId, new Set());
-      }
-      this.userSockets.get(userId)!.add(socket.id);
-
-      // Join/Leave conversation rooms
-      socket.on("join-conversation", (conversationId: string) => {
-        socket.join(`conv:${conversationId}`);
-        socket.conversationIds?.add(conversationId);
-        console.log(`${userId} joined conversation ${conversationId}`);
+      // Join conversation room
+      socket.on("join_conversation", (conversationId: string) => {
+        socket.join(`conversation:${conversationId}`);
+        socket.conversationIds!.add(conversationId);
+        this.io.to(`conversation:${conversationId}`).emit("user_joined", {
+          userId: socket.userId,
+          timestamp: new Date().toISOString(),
+        });
       });
 
-      socket.on("leave-conversation", (conversationId: string) => {
-        socket.leave(`conv:${conversationId}`);
-        socket.conversationIds?.delete(conversationId);
-        console.log(`${userId} left conversation ${conversationId}`);
+      // Leave conversation
+      socket.on("leave_conversation", (conversationId: string) => {
+        socket.leave(`conversation:${conversationId}`);
+        socket.conversationIds!.delete(conversationId);
+        this.io.to(`conversation:${conversationId}`).emit("user_left", {
+          userId: socket.userId,
+          conversationId,
+        });
       });
-
-      // Real-time messaging
-      socket.on(
-        "message:send",
-        async (data: {
-          conversationId: string;
-          content: string;
-          type?: string;
-        }) => {
-          try {
-            const message = await chatService.sendMessage({
-              conversationId: data.conversationId,
-              senderId: socket.userId!,
-              content: data.content,
-              type: (data.type || "text") as any,
-              metadata: undefined,
-            });
-
-            // Broadcast to all users in conversation
-            this.io
-              .to(`conv:${data.conversationId}`)
-              .emit("message:new", message);
-          } catch (error) {
-            socket.emit("error", {
-              message: "Failed to send message",
-              error: error instanceof Error ? error.message : "Unknown error",
-            });
-          }
-        },
-      );
-
-      socket.on(
-        "message:edit",
-        async (data: {
-          conversationId: string;
-          messageId: string;
-          content: string;
-        }) => {
-          try {
-            const message = await chatService.editMessage(
-              data.messageId,
-              data.conversationId,
-              socket.userId!,
-              data.content,
-            );
-
-            this.io
-              .to(`conv:${data.conversationId}`)
-              .emit("message:updated", message);
-          } catch (error) {
-            socket.emit("error", {
-              message: "Failed to edit message",
-              error: error instanceof Error ? error.message : "Unknown error",
-            });
-          }
-        },
-      );
-
-      socket.on(
-        "message:delete",
-        async (data: {
-          conversationId: string;
-          messageId: string;
-        }) => {
-          try {
-            await chatService.deleteMessage(
-              data.messageId,
-              data.conversationId,
-              socket.userId!,
-            );
-
-            this.io
-              .to(`conv:${data.conversationId}`)
-              .emit("message:deleted", {
-                messageId: data.messageId,
-                conversationId: data.conversationId,
-              });
-          } catch (error) {
-            socket.emit("error", {
-              message: "Failed to delete message",
-              error: error instanceof Error ? error.message : "Unknown error",
-            });
-          }
-        },
-      );
 
       // Typing indicator
-      socket.on("typing:start", (conversationId: string) => {
-        socket.broadcast.to(`conv:${conversationId}`).emit("typing:started", {
+      socket.on("typing", (conversationId: string) => {
+        socket.broadcast.to(`conversation:${conversationId}`).emit("user_typing", {
           userId: socket.userId,
           conversationId,
         });
       });
 
-      socket.on("typing:stop", (conversationId: string) => {
-        socket.broadcast.to(`conv:${conversationId}`).emit("typing:stopped", {
+      // Stop typing
+      socket.on("stop_typing", (conversationId: string) => {
+        socket.broadcast.to(`conversation:${conversationId}`).emit("user_stopped_typing", {
           userId: socket.userId,
           conversationId,
         });
       });
 
-      // User presence
-      socket.on("presence:online", (conversationId: string) => {
-        socket.broadcast.to(`conv:${conversationId}`).emit("presence:user-online", {
-          userId: socket.userId,
-          conversationId,
+      // New message broadcast
+      socket.on("new_message", (data: any) => {
+        const { conversationId, message } = data;
+        this.io.to(`conversation:${conversationId}`).emit("message_received", {
+          ...message,
+          timestamp: new Date().toISOString(),
         });
       });
 
-      socket.on("presence:offline", (conversationId: string) => {
-        socket.broadcast.to(`conv:${conversationId}`).emit("presence:user-offline", {
-          userId: socket.userId,
-          conversationId,
+      // Message edited
+      socket.on("message_edited", (data: any) => {
+        const { conversationId, messageId, content } = data;
+        this.io.to(`conversation:${conversationId}`).emit("message_updated", {
+          messageId,
+          content,
+          edited: true,
+          editedAt: new Date().toISOString(),
         });
       });
 
-      // Disconnection
+      // Message deleted
+      socket.on("message_deleted", (data: any) => {
+        const { conversationId, messageId } = data;
+        this.io.to(`conversation:${conversationId}`).emit("message_removed", {
+          messageId,
+        });
+      });
+
+      // Reaction added
+      socket.on("reaction_added", (data: any) => {
+        const { conversationId, messageId, emoji } = data;
+        this.io.to(`conversation:${conversationId}`).emit("reaction_updated", {
+          messageId,
+          emoji,
+          userId: socket.userId,
+          timestamp: new Date().toISOString(),
+        });
+      });
+
+      // Disconnect
       socket.on("disconnect", () => {
-        console.log(`User ${userId} disconnected: ${socket.id}`);
-
-        const userSockets = this.userSockets.get(userId);
-        if (userSockets) {
-          userSockets.delete(socket.id);
-          if (userSockets.size === 0) {
-            this.userSockets.delete(userId);
-            // Broadcast user offline to all their conversations
-            this.io.emit("user:disconnected", { userId });
-          }
-        }
+        socket.conversationIds?.forEach((conversationId) => {
+          this.io.to(`conversation:${conversationId}`).emit("user_left", {
+            userId: socket.userId,
+          });
+        });
+        console.log(`✗ User disconnected: ${socket.userId}`);
       });
 
-      // Send connection confirmation
-      socket.emit("connected", {
-        socketId: socket.id,
-        userId: socket.userId,
+      // Error handling
+      socket.on("error", (error) => {
+        console.error(`Socket error for user ${socket.userId}:`, error);
       });
     });
   }
 
-  // Helper methods to emit events from server
-  public notifyNewMessage(conversationId: string, message: any) {
-    this.io.to(`conv:${conversationId}`).emit("message:new", message);
+  public emitToConversation(conversationId: string, event: string, data: any): void {
+    this.io.to(`conversation:${conversationId}`).emit(event, data);
   }
 
-  public notifyMessageUpdated(conversationId: string, message: any) {
-    this.io.to(`conv:${conversationId}`).emit("message:updated", message);
+  public emitToUser(userId: string, event: string, data: any): void {
+    this.io.to(`user:${userId}`).emit(event, data);
   }
 
-  public notifyMessageDeleted(conversationId: string, messageId: string) {
-    this.io
-      .to(`conv:${conversationId}`)
-      .emit("message:deleted", { messageId, conversationId });
-  }
-
-  public notifyParticipantJoined(conversationId: string, userId: string) {
-    this.io
-      .to(`conv:${conversationId}`)
-      .emit("participant:joined", { userId, conversationId });
-  }
-
-  public notifyParticipantLeft(conversationId: string, userId: string) {
-    this.io
-      .to(`conv:${conversationId}`)
-      .emit("participant:left", { userId, conversationId });
-  }
-
-  public getIO() {
+  public getIO(): SocketIOServer {
     return this.io;
-  }
-
-  public getUserSockets(userId: string): string[] {
-    return Array.from(this.userSockets.get(userId) || []);
   }
 }

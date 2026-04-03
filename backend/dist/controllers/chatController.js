@@ -172,7 +172,7 @@ async function searchMessages(req, res) {
 }
 async function addReaction(req, res) {
     try {
-        const { conversationId, messageId } = req.params;
+        const { messageId } = req.params;
         const { emoji } = req.body;
         if (!emoji) {
             return (0, errors_1.sendError)(res, "Emoji required", 400);

@@ -1,220 +1,251 @@
-// Payment Service - Stripe integration for subscriptions and purchases
-import Stripe from "stripe";
+// Payment Service - Mobile money integrations for M-Pesa, Yas, and Airtel Money
 import { AppDataSource } from "../config/database";
-import { MerchantSubscription } from "../entities/MerchantSubscription";
 import { CustomerPurchase } from "../entities/CustomerPurchase";
-import { STRIPE_SECRET_KEY } from "../config/env";
+import {
+  createProviderClient,
+  getConfiguredProviderNames,
+  type MobileMoneyProviderName,
+} from "./mobileMoneyProviders";
 
-// Initialize Stripe
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let stripeInstance: any = null;
-if (STRIPE_SECRET_KEY) {
-  stripeInstance = new (Stripe as any)(STRIPE_SECRET_KEY, {
-    apiVersion: "2023-10-16",
-  });
-}
-
-const subRepo = () => AppDataSource.getRepository(MerchantSubscription);
 const purchaseRepo = () => AppDataSource.getRepository(CustomerPurchase);
 
-interface CreateSubscriptionOptions {
-  merchantId: string;
-  priceId: string;
-  planName: "starter" | "pro" | "enterprise";
-}
-
-interface CreatePurchaseIntentOptions {
-  customerId: string;
-  productType: "nfc_card" | "ring" | "other";
+interface InitiateCollectionOptions {
+  customerUserId: string;
+  provider: MobileMoneyProviderName;
+  phoneNumber: string;
   amount: number;
   currency?: string;
+  reference: string;
+  customerName?: string;
+  description?: string;
+  productType?: "nfc_card" | "ring" | "other";
 }
 
-/**
- * Create merchant subscription
- */
-export async function createMerchantSubscription(
-  options: CreateSubscriptionOptions,
-): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
-  try {
-    const subscription = await stripeInstance.subscriptions.create({
-      customer: options.merchantId, // Assumes merchantId is Stripe customer ID
-      items: [{ price: options.priceId }],
-      metadata: { planName: options.planName },
-    });
+function normalizePhoneNumber(phoneNumber: string): string {
+  const trimmed = phoneNumber.replace(/[^\d+]/g, "");
 
-    // Save to database
-    const dbSubscription = subRepo().create({
-      merchantId: options.merchantId,
-      stripeSubscriptionId: subscription.id,
-      stripePriceId: options.priceId,
-      planName: options.planName,
-      status: "trialing",
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-    });
-
-    await subRepo().save(dbSubscription);
-
-    return {
-      success: true,
-      subscriptionId: subscription.id,
-    };
-  } catch (error) {
-    console.error("Error creating subscription:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Subscription creation failed",
-    };
+  if (trimmed.startsWith("+")) {
+    return trimmed.slice(1);
   }
+
+  if (trimmed.startsWith("0")) {
+    return `255${trimmed.slice(1)}`;
+  }
+
+  return trimmed;
 }
 
-/**
- * Create payment intent for one-time purchase
- */
-export async function createPaymentIntent(
-  options: CreatePurchaseIntentOptions,
-): Promise<{ success: boolean; clientSecret?: string; purchaseId?: string; error?: string }> {
-  try {
-    const intent = await stripeInstance.paymentIntents.create({
-      amount: Math.round(options.amount * 100), // Convert to cents
-      currency: options.currency || "usd",
-      customer: options.customerId,
-      metadata: { productType: options.productType },
-    });
+export function getSupportedProviders() {
+  return [
+    {
+      id: "mpesa" as const,
+      name: "M-Pesa",
+      configured: getConfiguredProviderNames().includes("mpesa"),
+    },
+    {
+      id: "yas" as const,
+      name: "Yas / Mixx",
+      configured: getConfiguredProviderNames().includes("yas"),
+    },
+    {
+      id: "airtel_money" as const,
+      name: "Airtel Money",
+      configured: getConfiguredProviderNames().includes("airtel_money"),
+    },
+  ];
+}
 
-    // Save purchase record
+export async function initiateCollection(
+  options: InitiateCollectionOptions,
+): Promise<{
+  success: boolean;
+  paymentId?: string;
+  providerTransactionId?: string;
+  status?: "pending" | "succeeded" | "failed" | "cancelled";
+  error?: string;
+}> {
+  try {
+    if (!options.provider || !options.phoneNumber || !options.reference) {
+      return {
+        success: false,
+        error: "Provider, phone number, and reference are required",
+      };
+    }
+
+    if (!options.amount || Number(options.amount) <= 0) {
+      return {
+        success: false,
+        error: "Amount must be greater than zero",
+      };
+    }
+
+    const providerClient = createProviderClient(options.provider);
+    const normalizedPhoneNumber = normalizePhoneNumber(options.phoneNumber);
+
     const purchase = purchaseRepo().create({
-      customerId: options.customerId,
-      stripePaymentIntentId: intent.id,
-      productType: options.productType,
+      customerId: options.customerUserId,
+      provider: options.provider,
+      phoneNumber: normalizedPhoneNumber,
+      providerReference: options.reference,
+      productType: options.productType || "other",
       amount: options.amount,
-      currency: options.currency || "USD",
+      currency: options.currency || "TZS",
       status: "pending",
-      metadata: { amount: options.amount },
+      metadata: {
+        description: options.description,
+        customerName: options.customerName,
+      },
     });
 
     await purchaseRepo().save(purchase);
 
+    const result = await providerClient.initiateCollection({
+      phoneNumber: normalizedPhoneNumber,
+      amount: options.amount,
+      reference: options.reference,
+      customerName: options.customerName,
+      description: options.description,
+      currency: options.currency || "TZS",
+    });
+
+    await purchaseRepo().update(
+      { id: purchase.id },
+      {
+        providerTransactionId: result.providerTransactionId,
+        status: result.status,
+        metadata: {
+          ...(purchase.metadata || {}),
+          initiationResponse: result.raw,
+        },
+      },
+    );
+
     return {
       success: true,
-      clientSecret: intent.client_secret || "",
-      purchaseId: purchase.id,
+      paymentId: purchase.id,
+      providerTransactionId: result.providerTransactionId,
+      status: result.status,
     };
   } catch (error) {
-    console.error("Error creating payment intent:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Payment intent creation failed",
+      error:
+        error instanceof Error ? error.message : "Payment initiation failed",
     };
   }
 }
 
-/**
- * Handle Stripe webhook events
- */
-export async function handleStripeWebhook(
-  event: any, // Type would be Stripe.Event but causes issues
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    switch (event.type) {
-      case "customer.subscription.updated": {
-        const subscription = event.data.object as any;
-        await updateMerchantSubscription(subscription.id, subscription.status, subscription);
-        break;
-      }
-
-      case "customer.subscription.deleted": {
-        const subscription = event.data.object as any;
-        await cancelMerchantSubscription(subscription.id);
-        break;
-      }
-
-      case "payment_intent.succeeded": {
-        const intent = event.data.object as any;
-        await confirmPurchase(intent.id, "succeeded");
-        break;
-      }
-
-      case "payment_intent.payment_failed": {
-        const intent = event.data.object as any;
-        await confirmPurchase(intent.id, "failed");
-        break;
-      }
-
-      default:
-        console.log(`Unhandled event type: ${event.type}`);
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error handling webhook:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Webhook handling failed",
-    };
-  }
+export async function getPaymentStatus(
+  paymentId: string,
+  customerId?: string,
+): Promise<CustomerPurchase | null> {
+  const where = customerId ? { id: paymentId, customerId } : { id: paymentId };
+  return await purchaseRepo().findOne({ where });
 }
 
-/**
- * Update merchant subscription status
- */
-async function updateMerchantSubscription(
-  stripeSubId: string,
-  status: string,
-  subscription: any,
-): Promise<void> {
-  await subRepo().update(
-    { stripeSubscriptionId: stripeSubId },
-    {
-      status: status as any,
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-    },
-  );
-}
-
-/**
- * Cancel merchant subscription
- */
-async function cancelMerchantSubscription(stripeSubId: string): Promise<void> {
-  await subRepo().update(
-    { stripeSubscriptionId: stripeSubId },
-    {
-      status: "canceled",
-      canceledAt: new Date(),
-    },
-  );
-}
-
-/**
- * Confirm purchase status
- */
-async function confirmPurchase(stripePaymentIntentId: string, status: "succeeded" | "failed"): Promise<void> {
-  await purchaseRepo().update(
-    { stripePaymentIntentId },
-    {
-      status: status as any,
-    },
-  );
-}
-
-/**
- * Get merchant subscription
- */
-export async function getMerchantSubscription(merchantId: string) {
-  return await subRepo().findOne({
-    where: { merchantId },
-    order: { createdAt: "DESC" },
-  });
-}
-
-/**
- * Get customer purchases
- */
 export async function getCustomerPurchases(customerId: string) {
   return await purchaseRepo().find({
     where: { customerId },
     order: { createdAt: "DESC" },
   });
 }
+
+export async function handleProviderCallback(
+  provider: MobileMoneyProviderName,
+  payload: Record<string, unknown>,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const providerTransactionId = findTransactionId(payload);
+    const providerReference = findReference(payload);
+    const status = normalizeProviderStatus(payload);
+
+    if (!providerTransactionId && !providerReference) {
+      return {
+        success: false,
+        error: "Provider callback missing transaction identifiers",
+      };
+    }
+
+    const purchase = await purchaseRepo().findOne({
+      where: providerTransactionId
+        ? { provider, providerTransactionId }
+        : { provider, providerReference },
+    });
+
+    if (!purchase) {
+      return {
+        success: false,
+        error: "Payment record not found for callback",
+      };
+    }
+
+    await purchaseRepo().update(
+      { id: purchase.id },
+      {
+        status,
+        metadata: {
+          ...(purchase.metadata || {}),
+          callbackPayload: payload,
+        },
+      },
+    );
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Provider callback failed",
+    };
+  }
+}
+
+function findTransactionId(payload: Record<string, unknown>): string | undefined {
+  const candidates = [
+    payload.transactionId,
+    payload.providerTransactionId,
+    payload.checkoutRequestId,
+    payload.requestId,
+    payload.externalId,
+  ];
+
+  return candidates.find((value): value is string => typeof value === "string");
+}
+
+function findReference(payload: Record<string, unknown>): string | undefined {
+  const candidates = [
+    payload.reference,
+    payload.providerReference,
+    payload.accountReference,
+    payload.orderId,
+  ];
+
+  return candidates.find((value): value is string => typeof value === "string");
+}
+
+function normalizeProviderStatus(
+  payload: Record<string, unknown>,
+): "pending" | "succeeded" | "failed" | "cancelled" {
+  const rawStatus = [
+    payload.status,
+    payload.result,
+    payload.transactionStatus,
+  ].find((value): value is string => typeof value === "string");
+
+  const normalized = rawStatus?.toLowerCase() || "pending";
+
+  if (["success", "successful", "completed", "succeeded", "paid"].includes(normalized)) {
+    return "succeeded";
+  }
+
+  if (["failed", "error", "declined"].includes(normalized)) {
+    return "failed";
+  }
+
+  if (["cancelled", "canceled"].includes(normalized)) {
+    return "cancelled";
+  }
+
+  return "pending";
+}
+

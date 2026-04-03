@@ -1,262 +1,228 @@
 // WebSocket Context
-// Real-time communication using Socket.io
+// Real-time chat client using Socket.io
 
 import { io, Socket } from "socket.io-client";
-import { getAuthToken } from "./api";
 
-interface ChatMessage {
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+interface MessageEventData {
   id: string;
   conversationId: string;
   senderId: string;
   content: string;
   type: "text" | "image" | "file" | "system";
-  metadata?: Record<string, any>;
-  edited: boolean;
-  editedAt?: string;
   createdAt: string;
-  updatedAt: string;
 }
 
-type MessageEventHandler = (message: ChatMessage) => void;
-type MessageDeleteHandler = (data: {
-  messageId: string;
-  conversationId: string;
-}) => void;
-type TypingHandler = (data: {
+interface TypingData {
   userId: string;
   conversationId: string;
-}) => void;
+}
 
-class WebSocketService {
+interface UserPresenceData {
+  userId: string;
+  conversationId?: string;
+  timestamp?: string;
+}
+
+export class WebSocketService {
   private socket: Socket | null = null;
-  private messageHandlers: Map<string, Set<MessageEventHandler>> = new Map();
-  private deleteHandlers: Set<MessageDeleteHandler> = new Set();
-  private typingHandlers: Map<string, Set<TypingHandler>> = new Map();
-  private presenceHandlers: Map<string, Set<TypingHandler>> = new Map();
+  private token: string | null = null;
+  private userId: string | null = null;
+  private messageListeners: Map<
+    string,
+    (message: MessageEventData) => void
+  > = new Map();
+  private typingListeners: Map<string, (data: TypingData) => void> = new Map();
+  private joinedConversations: Set<string> = new Set();
 
-  connect(userId: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const token = getAuthToken();
+  constructor() {}
 
-      this.socket = io(
-        typeof window !== "undefined"
-          ? window.location.origin
-          : "http://localhost:3001",
-        {
-          auth: { token },
-          query: { userId },
-          transports: ["websocket", "polling"],
-          reconnection: true,
-          reconnectionDelay: 1000,
-          reconnectionDelayMax: 5000,
-          reconnectionAttempts: 5,
-        },
-      );
+  public connect(token: string, userId: string): void {
+    if (this.socket?.connected) return;
 
-      this.socket.on("connected", (data) => {
-        console.log("✓ WebSocket connected", data);
-        this.setupEventHandlers();
-        resolve();
-      });
+    this.token = token;
+    this.userId = userId;
 
-      this.socket.on("error", (error) => {
-        console.error("WebSocket error:", error);
-        reject(error);
-      });
-
-      this.socket.on("connect_error", (error) => {
-        console.error("WebSocket connection error:", error);
-        reject(error);
-      });
+    this.socket = io(API_BASE_URL, {
+      auth: {
+        token,
+        userId,
+      },
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+      transports: ["websocket", "polling"],
     });
+
+    this.setupEventListeners();
   }
 
-  private setupEventHandlers() {
+  private setupEventListeners(): void {
     if (!this.socket) return;
 
+    // Connection events
+    this.socket.on("connect", () => {
+      console.log("✓ WebSocket connected");
+    });
+
+    this.socket.on("connect_error", (error) => {
+      console.error("WebSocket connection error:", error);
+    });
+
+    this.socket.on("disconnect", () => {
+      console.log("✗ WebSocket disconnected");
+    });
+
     // Message events
-    this.socket.on("message:new", (message: ChatMessage) => {
-      this.triggerMessageHandlers(message.conversationId, message);
+    this.socket.on("message_received", (message: MessageEventData) => {
+      const listener = this.messageListeners.get(message.conversationId);
+      if (listener) {
+        listener(message);
+      }
     });
 
-    this.socket.on("message:updated", (message: ChatMessage) => {
-      this.triggerMessageHandlers(message.conversationId, message);
+    this.socket.on("message_updated", (data: any) => {
+      console.log("Message updated:", data);
     });
 
-    this.socket.on(
-      "message:deleted",
-      (data: { messageId: string; conversationId: string }) => {
-        this.deleteHandlers.forEach((handler) => handler(data));
-      },
-    );
+    this.socket.on("message_removed", (data: any) => {
+      console.log("Message removed:", data);
+    });
 
-    // Typing indicators
-    this.socket.on(
-      "typing:started",
-      (data: { userId: string; conversationId: string }) => {
-        this.triggerTypingHandlers(data.conversationId, data);
-      },
-    );
+    // Typing events
+    this.socket.on("user_typing", (data: TypingData) => {
+      const listener = this.typingListeners.get(`${data.conversationId}:typing`);
+      if (listener) {
+        listener(data);
+      }
+    });
 
-    this.socket.on(
-      "typing:stopped",
-      (data: { userId: string; conversationId: string }) => {
-        this.triggerTypingHandlers(data.conversationId, data);
-      },
-    );
+    this.socket.on("user_stopped_typing", (data: TypingData) => {
+      const listener = this.typingListeners.get(`${data.conversationId}:stopped`);
+      if (listener) {
+        listener(data);
+      }
+    });
 
-    // Presence
-    this.socket.on(
-      "presence:user-online",
-      (data: { userId: string; conversationId: string }) => {
-        this.triggerPresenceHandlers(data.conversationId, data);
-      },
-    );
+    // Presence events
+    this.socket.on("user_joined", (data: UserPresenceData) => {
+      console.log("User joined:", data);
+    });
 
-    this.socket.on(
-      "presence:user-offline",
-      (data: { userId: string; conversationId: string }) => {
-        this.triggerPresenceHandlers(data.conversationId, data);
-      },
-    );
+    this.socket.on("user_left", (data: UserPresenceData) => {
+      console.log("User left:", data);
+    });
+
+    // Reaction events
+    this.socket.on("reaction_updated", (data: any) => {
+      console.log("Reaction added:", data);
+    });
   }
 
-  // Join conversation room
-  joinConversation(conversationId: string) {
-    this.socket?.emit("join-conversation", conversationId);
+  public joinConversation(conversationId: string): void {
+    if (!this.socket) return;
+
+    this.socket.emit("join_conversation", conversationId);
+    this.joinedConversations.add(conversationId);
   }
 
-  // Leave conversation room
-  leaveConversation(conversationId: string) {
-    this.socket?.emit("leave-conversation", conversationId);
+  public leaveConversation(conversationId: string): void {
+    if (!this.socket) return;
+
+    this.socket.emit("leave_conversation", conversationId);
+    this.joinedConversations.delete(conversationId);
   }
 
-  // Send message
-  sendMessage(
-    conversationId: string,
-    content: string,
-    type: string = "text",
-  ) {
-    this.socket?.emit("message:send", {
+  public sendMessage(conversationId: string, message: MessageEventData): void {
+    if (!this.socket) return;
+
+    this.socket.emit("new_message", {
       conversationId,
-      content,
-      type,
+      message,
     });
   }
 
-  // Edit message
-  editMessage(
-    conversationId: string,
-    messageId: string,
-    content: string,
-  ) {
-    this.socket?.emit("message:edit", {
-      conversationId,
-      messageId,
-      content,
-    });
+  public typing(conversationId: string): void {
+    if (!this.socket) return;
+
+    this.socket.emit("typing", conversationId);
   }
 
-  // Delete message
-  deleteMessage(
-    conversationId: string,
-    messageId: string,
-  ) {
-    this.socket?.emit("message:delete", {
+  public stopTyping(conversationId: string): void {
+    if (!this.socket) return;
+
+    this.socket.emit("stop_typing", conversationId);
+  }
+
+  public editMessage(conversationId: string, messageId: string, content: string): void {
+    if (!this.socket) return;
+
+    this.socket.emit("message_edited", {
       conversationId,
       messageId,
+      content,
     });
   }
 
-  // Typing indicator
-  startTyping(conversationId: string) {
-    this.socket?.emit("typing:start", conversationId);
+  public deleteMessage(conversationId: string, messageId: string): void {
+    if (!this.socket) return;
+
+    this.socket.emit("message_deleted", {
+      conversationId,
+      messageId,
+    });
   }
 
-  stopTyping(conversationId: string) {
-    this.socket?.emit("typing:stop", conversationId);
+  public addReaction(conversationId: string, messageId: string, emoji: string): void {
+    if (!this.socket) return;
+
+    this.socket.emit("reaction_added", {
+      conversationId,
+      messageId,
+      emoji,
+    });
   }
 
-  // Presence
-  setOnline(conversationId: string) {
-    this.socket?.emit("presence:online", conversationId);
-  }
-
-  setOffline(conversationId: string) {
-    this.socket?.emit("presence:offline", conversationId);
-  }
-
-  // Event handlers
-  onMessage(conversationId: string, handler: MessageEventHandler) {
-    if (!this.messageHandlers.has(conversationId)) {
-      this.messageHandlers.set(conversationId, new Set());
-    }
-    this.messageHandlers.get(conversationId)!.add(handler);
+  public onMessage(conversationId: string, callback: (message: MessageEventData) => void): () => void {
+    this.messageListeners.set(conversationId, callback);
 
     return () => {
-      this.messageHandlers.get(conversationId)?.delete(handler);
+      this.messageListeners.delete(conversationId);
     };
   }
 
-  onMessageDelete(handler: MessageDeleteHandler) {
-    this.deleteHandlers.add(handler);
-    return () => this.deleteHandlers.delete(handler);
-  }
-
-  onTyping(conversationId: string, handler: TypingHandler) {
-    if (!this.typingHandlers.has(conversationId)) {
-      this.typingHandlers.set(conversationId, new Set());
-    }
-    this.typingHandlers.get(conversationId)!.add(handler);
+  public onTyping(conversationId: string, callback: (data: TypingData) => void): () => void {
+    this.typingListeners.set(`${conversationId}:typing`, callback);
 
     return () => {
-      this.typingHandlers.get(conversationId)?.delete(handler);
+      this.typingListeners.delete(`${conversationId}:typing`);
     };
   }
 
-  onPresence(conversationId: string, handler: TypingHandler) {
-    if (!this.presenceHandlers.has(conversationId)) {
-      this.presenceHandlers.set(conversationId, new Set());
-    }
-    this.presenceHandlers.get(conversationId)!.add(handler);
+  public onStopTyping(conversationId: string, callback: (data: TypingData) => void): () => void {
+    this.typingListeners.set(`${conversationId}:stopped`, callback);
 
     return () => {
-      this.presenceHandlers.get(conversationId)?.delete(handler);
+      this.typingListeners.delete(`${conversationId}:stopped`);
     };
   }
 
-  private triggerMessageHandlers(conversationId: string, message: ChatMessage) {
-    this.messageHandlers
-      .get(conversationId)
-      ?.forEach((handler) => handler(message));
-  }
-
-  private triggerTypingHandlers(
-    conversationId: string,
-    data: { userId: string; conversationId: string },
-  ) {
-    this.typingHandlers
-      .get(conversationId)
-      ?.forEach((handler) => handler(data));
-  }
-
-  private triggerPresenceHandlers(
-    conversationId: string,
-    data: { userId: string; conversationId: string },
-  ) {
-    this.presenceHandlers
-      .get(conversationId)
-      ?.forEach((handler) => handler(data));
-  }
-
-  disconnect() {
-    this.socket?.disconnect();
-    this.socket = null;
-  }
-
-  isConnected(): boolean {
+  public isConnected(): boolean {
     return this.socket?.connected ?? false;
+  }
+
+  public disconnect(): void {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    this.messageListeners.clear();
+    this.typingListeners.clear();
+    this.joinedConversations.clear();
   }
 }
 
+// Singleton instance
 export const wsService = new WebSocketService();

@@ -1,17 +1,12 @@
+import { Server as HttpServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
-import { Server as HTTPServer } from "http";
 export declare class WebSocketService {
     private io;
-    private userSockets;
-    constructor(server: HTTPServer);
+    constructor(httpServer: HttpServer);
     private setupMiddleware;
     private setupEventHandlers;
-    notifyNewMessage(conversationId: string, message: any): void;
-    notifyMessageUpdated(conversationId: string, message: any): void;
-    notifyMessageDeleted(conversationId: string, messageId: string): void;
-    notifyParticipantJoined(conversationId: string, userId: string): void;
-    notifyParticipantLeft(conversationId: string, userId: string): void;
-    getIO(): SocketIOServer<import("socket.io").DefaultEventsMap, import("socket.io").DefaultEventsMap, import("socket.io").DefaultEventsMap, any>;
-    getUserSockets(userId: string): string[];
+    emitToConversation(conversationId: string, event: string, data: any): void;
+    emitToUser(userId: string, event: string, data: any): void;
+    getIO(): SocketIOServer;
 }
 //# sourceMappingURL=websocketService.d.ts.map

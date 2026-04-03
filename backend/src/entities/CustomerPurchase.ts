@@ -4,6 +4,7 @@ import { User } from "./User";
 
 export type PurchaseStatus = "pending" | "succeeded" | "failed" | "cancelled";
 export type ProductType = "nfc_card" | "ring" | "other";
+export type PaymentProvider = "mpesa" | "yas" | "airtel_money";
 
 @Entity("customer_purchases")
 export class CustomerPurchase {
@@ -14,7 +15,16 @@ export class CustomerPurchase {
   customerId: string; // Foreign key to User
 
   @Column({ nullable: true })
-  stripePaymentIntentId?: string; // Stripe payment intent ID
+  provider?: PaymentProvider;
+
+  @Column({ nullable: true })
+  providerTransactionId?: string;
+
+  @Column({ nullable: true })
+  providerReference?: string;
+
+  @Column({ nullable: true })
+  phoneNumber?: string;
 
   @Column({ type: "enum", enum: ["nfc_card", "ring", "other"] })
   productType: ProductType;
@@ -29,7 +39,7 @@ export class CustomerPurchase {
   status: PurchaseStatus;
 
   @Column({ type: "jsonb", nullable: true })
-  metadata?: any; // Order details, quantity, etc.
+  metadata?: any; // Provider request/response metadata and callback payloads
 
   @CreateDateColumn()
   createdAt: Date;

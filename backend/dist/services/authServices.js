@@ -38,8 +38,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.register = register;
 exports.login = login;
 exports.getUserById = getUserById;
+exports.getUserByEmail = getUserByEmail;
 exports.updateProfile = updateProfile;
 exports.changePassword = changePassword;
+exports.resetPasswordDirect = resetPasswordDirect;
 exports.verifyToken = verifyToken;
 exports.generateTokenForExport = generateTokenForExport;
 exports.emailExists = emailExists;
@@ -187,6 +189,23 @@ async function getUserById(userId) {
         return null;
     }
 }
+async function getUserByEmail(email) {
+    try {
+        const user = await db_1.db.users.findByEmail(email);
+        if (!user)
+            return null;
+        return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+        };
+    }
+    catch (error) {
+        console.error("Error fetching user by email:", error);
+        return null;
+    }
+}
 // Update user profile
 async function updateProfile(userId, data) {
     try {
@@ -248,6 +267,28 @@ async function changePassword(userId, oldPassword, newPassword) {
         return {
             success: false,
             error: error instanceof Error ? error.message : "Password change failed",
+        };
+    }
+}
+async function resetPasswordDirect(userId, newPassword) {
+    try {
+        const user = await db_1.db.users.findById(userId);
+        if (!user) {
+            return { success: false, error: "User not found" };
+        }
+        const validation = (0, errors_1.validatePassword)(newPassword);
+        if (!validation.valid) {
+            return { success: false, error: validation.error };
+        }
+        const { default: bcrypt } = await Promise.resolve().then(() => __importStar(require("bcrypt")));
+        const hashedPassword = await bcrypt.hash(newPassword, errors_1.BCRYPT_SALT_ROUNDS);
+        await db_1.db.users.update(userId, { password: hashedPassword });
+        return { success: true };
+    }
+    catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Password reset failed",
         };
     }
 }

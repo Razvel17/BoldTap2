@@ -1,10 +1,14 @@
 import { User } from "./User";
 export type PurchaseStatus = "pending" | "succeeded" | "failed" | "cancelled";
 export type ProductType = "nfc_card" | "ring" | "other";
+export type PaymentProvider = "mpesa" | "yas" | "airtel_money";
 export declare class CustomerPurchase {
     id: string;
     customerId: string;
-    stripePaymentIntentId?: string;
+    provider?: PaymentProvider;
+    providerTransactionId?: string;
+    providerReference?: string;
+    phoneNumber?: string;
     productType: ProductType;
     amount: number;
     currency: string;

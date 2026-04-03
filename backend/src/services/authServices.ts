@@ -191,6 +191,23 @@ export async function getUserById(userId: string): Promise<UserProfile | null> {
   }
 }
 
+export async function getUserByEmail(email: string): Promise<UserProfile | null> {
+  try {
+    const user = await db.users.findByEmail(email);
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+    };
+  } catch (error) {
+    console.error("Error fetching user by email:", error);
+    return null;
+  }
+}
+
 // Update user profile
 export async function updateProfile(
   userId: string,
@@ -270,6 +287,34 @@ export async function changePassword(
   }
 }
 
+export async function resetPasswordDirect(
+  userId: string,
+  newPassword: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const user = await db.users.findById(userId);
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+
+    const validation = validatePassword(newPassword);
+    if (!validation.valid) {
+      return { success: false, error: validation.error };
+    }
+
+    const { default: bcrypt } = await import("bcrypt");
+    const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
+    await db.users.update(userId, { password: hashedPassword });
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Password reset failed",
+    };
+  }
+}
+
 // Verify token
 export async function verifyToken(token: string): Promise<TokenData | null> {
   try {
@@ -304,4 +349,3 @@ export async function emailExists(email: string): Promise<boolean> {
   const user = await db.users.findByEmail(email);
   return !!user;
 }
-

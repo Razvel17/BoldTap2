@@ -27,7 +27,19 @@ __decorate([
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
-], CustomerPurchase.prototype, "stripePaymentIntentId", void 0);
+], CustomerPurchase.prototype, "provider", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], CustomerPurchase.prototype, "providerTransactionId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], CustomerPurchase.prototype, "providerReference", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], CustomerPurchase.prototype, "phoneNumber", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "enum", enum: ["nfc_card", "ring", "other"] }),
     __metadata("design:type", String)

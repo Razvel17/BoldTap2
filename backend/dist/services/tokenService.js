@@ -7,6 +7,7 @@ exports.generateToken = generateToken;
 exports.hashToken = hashToken;
 exports.createRefreshToken = createRefreshToken;
 exports.verifyRefreshToken = verifyRefreshToken;
+exports.getRefreshTokenRecord = getRefreshTokenRecord;
 exports.revokeRefreshToken = revokeRefreshToken;
 exports.createVerificationToken = createVerificationToken;
 exports.verifyAndUseToken = verifyAndUseToken;
@@ -58,6 +59,21 @@ async function verifyRefreshToken(token, userId) {
         return false;
     }
     return true;
+}
+async function getRefreshTokenRecord(token) {
+    const tokenHash = hashToken(token);
+    const refreshToken = await refreshTokenRepo().findOne({
+        where: {
+            tokenHash,
+            revokedAt: (0, typeorm_1.IsNull)(),
+        },
+    });
+    if (!refreshToken)
+        return null;
+    if (new Date() > refreshToken.expiresAt) {
+        return null;
+    }
+    return { userId: refreshToken.userId };
 }
 // Revoke a refresh token (logout)
 async function revokeRefreshToken(token, userId) {

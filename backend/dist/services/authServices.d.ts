@@ -22,6 +22,7 @@ interface TokenData {
 export declare function register(input: RegisterInput): Promise<AuthResponse>;
 export declare function login(input: LoginInput): Promise<AuthResponse>;
 export declare function getUserById(userId: string): Promise<UserProfile | null>;
+export declare function getUserByEmail(email: string): Promise<UserProfile | null>;
 export declare function updateProfile(userId: string, data: {
     name?: string;
     phone?: string;
@@ -31,6 +32,10 @@ export declare function updateProfile(userId: string, data: {
     error?: string;
 }>;
 export declare function changePassword(userId: string, oldPassword: string, newPassword: string): Promise<{
+    success: boolean;
+    error?: string;
+}>;
+export declare function resetPasswordDirect(userId: string, newPassword: string): Promise<{
     success: boolean;
     error?: string;
 }>;

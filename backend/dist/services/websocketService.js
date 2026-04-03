@@ -1,48 +1,13 @@
 "use strict";
 // WebSocket Service
-// Handles real-time chat events using Socket.io
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
+// Real-time chat using Socket.io
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WebSocketService = void 0;
 const socket_io_1 = require("socket.io");
 const env_1 = require("../config/env");
-const chatService = __importStar(require("./chatService"));
 class WebSocketService {
-    constructor(server) {
-        this.userSockets = new Map(); // userId -> socketIds
-        this.io = new socket_io_1.Server(server, {
+    constructor(httpServer) {
+        this.io = new socket_io_1.Server(httpServer, {
             cors: {
                 origin: env_1.FRONTEND_URL,
                 methods: ["GET", "POST"],
@@ -54,165 +19,121 @@ class WebSocketService {
         this.setupEventHandlers();
     }
     setupMiddleware() {
-        this.io.use((socket, next) => {
-            // Token verification would go here
-            const userId = socket.handshake.query.userId;
-            if (userId) {
-                socket.userId = userId;
+        this.io.use(async (socket, next) => {
+            try {
+                const token = socket.handshake.auth.token;
+                if (!token) {
+                    return next(new Error("No token provided"));
+                }
+                // Basic JWT verification (token format check)
+                if (typeof token !== "string" || !token.startsWith("ey")) {
+                    return next(new Error("Invalid token format"));
+                }
+                socket.userId = socket.handshake.auth.userId;
                 socket.conversationIds = new Set();
+                if (!socket.userId) {
+                    return next(new Error("No user ID in token"));
+                }
                 next();
             }
-            else {
+            catch (error) {
                 next(new Error("Authentication failed"));
             }
         });
     }
     setupEventHandlers() {
         this.io.on("connection", (socket) => {
-            const userId = socket.userId;
-            console.log(`User ${userId} connected: ${socket.id}`);
-            // Track user sockets
-            if (!this.userSockets.has(userId)) {
-                this.userSockets.set(userId, new Set());
-            }
-            this.userSockets.get(userId).add(socket.id);
-            // Join/Leave conversation rooms
-            socket.on("join-conversation", (conversationId) => {
-                socket.join(`conv:${conversationId}`);
-                socket.conversationIds?.add(conversationId);
-                console.log(`${userId} joined conversation ${conversationId}`);
+            console.log(`✓ User connected: ${socket.userId}`);
+            // Join conversation room
+            socket.on("join_conversation", (conversationId) => {
+                socket.join(`conversation:${conversationId}`);
+                socket.conversationIds.add(conversationId);
+                this.io.to(`conversation:${conversationId}`).emit("user_joined", {
+                    userId: socket.userId,
+                    timestamp: new Date().toISOString(),
+                });
             });
-            socket.on("leave-conversation", (conversationId) => {
-                socket.leave(`conv:${conversationId}`);
-                socket.conversationIds?.delete(conversationId);
-                console.log(`${userId} left conversation ${conversationId}`);
-            });
-            // Real-time messaging
-            socket.on("message:send", async (data) => {
-                try {
-                    const message = await chatService.sendMessage({
-                        conversationId: data.conversationId,
-                        senderId: socket.userId,
-                        content: data.content,
-                        type: (data.type || "text"),
-                        metadata: undefined,
-                    });
-                    // Broadcast to all users in conversation
-                    this.io
-                        .to(`conv:${data.conversationId}`)
-                        .emit("message:new", message);
-                }
-                catch (error) {
-                    socket.emit("error", {
-                        message: "Failed to send message",
-                        error: error instanceof Error ? error.message : "Unknown error",
-                    });
-                }
-            });
-            socket.on("message:edit", async (data) => {
-                try {
-                    const message = await chatService.editMessage(data.messageId, data.conversationId, socket.userId, data.content);
-                    this.io
-                        .to(`conv:${data.conversationId}`)
-                        .emit("message:updated", message);
-                }
-                catch (error) {
-                    socket.emit("error", {
-                        message: "Failed to edit message",
-                        error: error instanceof Error ? error.message : "Unknown error",
-                    });
-                }
-            });
-            socket.on("message:delete", async (data) => {
-                try {
-                    await chatService.deleteMessage(data.messageId, data.conversationId, socket.userId);
-                    this.io
-                        .to(`conv:${data.conversationId}`)
-                        .emit("message:deleted", {
-                        messageId: data.messageId,
-                        conversationId: data.conversationId,
-                    });
-                }
-                catch (error) {
-                    socket.emit("error", {
-                        message: "Failed to delete message",
-                        error: error instanceof Error ? error.message : "Unknown error",
-                    });
-                }
+            // Leave conversation
+            socket.on("leave_conversation", (conversationId) => {
+                socket.leave(`conversation:${conversationId}`);
+                socket.conversationIds.delete(conversationId);
+                this.io.to(`conversation:${conversationId}`).emit("user_left", {
+                    userId: socket.userId,
+                    conversationId,
+                });
             });
             // Typing indicator
-            socket.on("typing:start", (conversationId) => {
-                socket.broadcast.to(`conv:${conversationId}`).emit("typing:started", {
+            socket.on("typing", (conversationId) => {
+                socket.broadcast.to(`conversation:${conversationId}`).emit("user_typing", {
                     userId: socket.userId,
                     conversationId,
                 });
             });
-            socket.on("typing:stop", (conversationId) => {
-                socket.broadcast.to(`conv:${conversationId}`).emit("typing:stopped", {
+            // Stop typing
+            socket.on("stop_typing", (conversationId) => {
+                socket.broadcast.to(`conversation:${conversationId}`).emit("user_stopped_typing", {
                     userId: socket.userId,
                     conversationId,
                 });
             });
-            // User presence
-            socket.on("presence:online", (conversationId) => {
-                socket.broadcast.to(`conv:${conversationId}`).emit("presence:user-online", {
-                    userId: socket.userId,
-                    conversationId,
+            // New message broadcast
+            socket.on("new_message", (data) => {
+                const { conversationId, message } = data;
+                this.io.to(`conversation:${conversationId}`).emit("message_received", {
+                    ...message,
+                    timestamp: new Date().toISOString(),
                 });
             });
-            socket.on("presence:offline", (conversationId) => {
-                socket.broadcast.to(`conv:${conversationId}`).emit("presence:user-offline", {
-                    userId: socket.userId,
-                    conversationId,
+            // Message edited
+            socket.on("message_edited", (data) => {
+                const { conversationId, messageId, content } = data;
+                this.io.to(`conversation:${conversationId}`).emit("message_updated", {
+                    messageId,
+                    content,
+                    edited: true,
+                    editedAt: new Date().toISOString(),
                 });
             });
-            // Disconnection
+            // Message deleted
+            socket.on("message_deleted", (data) => {
+                const { conversationId, messageId } = data;
+                this.io.to(`conversation:${conversationId}`).emit("message_removed", {
+                    messageId,
+                });
+            });
+            // Reaction added
+            socket.on("reaction_added", (data) => {
+                const { conversationId, messageId, emoji } = data;
+                this.io.to(`conversation:${conversationId}`).emit("reaction_updated", {
+                    messageId,
+                    emoji,
+                    userId: socket.userId,
+                    timestamp: new Date().toISOString(),
+                });
+            });
+            // Disconnect
             socket.on("disconnect", () => {
-                console.log(`User ${userId} disconnected: ${socket.id}`);
-                const userSockets = this.userSockets.get(userId);
-                if (userSockets) {
-                    userSockets.delete(socket.id);
-                    if (userSockets.size === 0) {
-                        this.userSockets.delete(userId);
-                        // Broadcast user offline to all their conversations
-                        this.io.emit("user:disconnected", { userId });
-                    }
-                }
+                socket.conversationIds?.forEach((conversationId) => {
+                    this.io.to(`conversation:${conversationId}`).emit("user_left", {
+                        userId: socket.userId,
+                    });
+                });
+                console.log(`✗ User disconnected: ${socket.userId}`);
             });
-            // Send connection confirmation
-            socket.emit("connected", {
-                socketId: socket.id,
-                userId: socket.userId,
+            // Error handling
+            socket.on("error", (error) => {
+                console.error(`Socket error for user ${socket.userId}:`, error);
             });
         });
     }
-    // Helper methods to emit events from server
-    notifyNewMessage(conversationId, message) {
-        this.io.to(`conv:${conversationId}`).emit("message:new", message);
+    emitToConversation(conversationId, event, data) {
+        this.io.to(`conversation:${conversationId}`).emit(event, data);
     }
-    notifyMessageUpdated(conversationId, message) {
-        this.io.to(`conv:${conversationId}`).emit("message:updated", message);
-    }
-    notifyMessageDeleted(conversationId, messageId) {
-        this.io
-            .to(`conv:${conversationId}`)
-            .emit("message:deleted", { messageId, conversationId });
-    }
-    notifyParticipantJoined(conversationId, userId) {
-        this.io
-            .to(`conv:${conversationId}`)
-            .emit("participant:joined", { userId, conversationId });
-    }
-    notifyParticipantLeft(conversationId, userId) {
-        this.io
-            .to(`conv:${conversationId}`)
-            .emit("participant:left", { userId, conversationId });
+    emitToUser(userId, event, data) {
+        this.io.to(`user:${userId}`).emit(event, data);
     }
     getIO() {
         return this.io;
-    }
-    getUserSockets(userId) {
-        return Array.from(this.userSockets.get(userId) || []);
     }
 }
 exports.WebSocketService = WebSocketService;

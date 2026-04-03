@@ -1,6 +1,6 @@
 # BoldTap Backend API
 
-Complete, production-ready backend for the BoldTap loyalty card and NFC business card system.
+Complete backend for the BoldTap loyalty card, NFC business card, auth, chat, websocket, and mobile money payment system.
 
 ## Features
 
@@ -34,6 +34,13 @@ Complete, production-ready backend for the BoldTap loyalty card and NFC business
 - Input validation and error handling
 - Graceful shutdown handling
 
+✅ **Mobile Money Payments**
+
+- Provider-agnostic payment flow
+- M-Pesa, Yas / Mixx, and Airtel Money integration points
+- Provider callback handling
+- Payment status tracking and purchase history
+
 ✅ **Database Agnostic**
 
 - In-memory database for development (no setup needed)
@@ -65,6 +72,23 @@ NODE_ENV=development
 BACKEND_URL=http://localhost:3001
 FRONTEND_URL=http://localhost:3000
 JWT_SECRET=your-secret-key-here
+SESSION_SECRET=your-session-secret-here
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/boldtap
+
+MPESA_API_URL=
+MPESA_STATUS_URL=
+MPESA_API_KEY=
+MPESA_BUSINESS_ID=
+
+YAS_API_URL=
+YAS_STATUS_URL=
+YAS_API_KEY=
+YAS_BUSINESS_ID=
+
+AIRTEL_MONEY_API_URL=
+AIRTEL_MONEY_STATUS_URL=
+AIRTEL_MONEY_API_KEY=
+AIRTEL_MONEY_BUSINESS_ID=
 ```
 
 ### 3. Start Development Server
@@ -167,6 +191,16 @@ curl http://localhost:3001/api
 | PUT    | `/api/nfc/profile/:profileId` | Update profile     |
 | DELETE | `/api/nfc/profile/:profileId` | Delete profile     |
 
+### Payments (`/api/payments`)
+
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| GET | `/api/payments/providers` | List supported mobile money providers |
+| POST | `/api/payments/collect` | Initiate a mobile money collection |
+| GET | `/api/payments/:paymentId/status` | Get a payment status |
+| GET | `/api/payments/customer/history` | Get payment history |
+| POST | `/api/payments/webhook/:provider` | Provider callback endpoint |
+
 ## Request/Response Format
 
 ### Success Response (2xx)
@@ -240,6 +274,24 @@ curl -X POST http://localhost:3001/auth/login \
   -d '{
     "email": "john@example.com",
     "password": "SecurePassword123"
+  }'
+```
+
+### Initiate Mobile Money Collection
+
+```bash
+curl -X POST http://localhost:3001/api/payments/collect \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "mpesa",
+    "phoneNumber": "0712345678",
+    "amount": 1000,
+    "currency": "TZS",
+    "reference": "ORDER-1001",
+    "customerName": "John Doe",
+    "description": "BoldTap NFC card",
+    "productType": "nfc_card"
   }'
 ```
 
