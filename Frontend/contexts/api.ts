@@ -329,3 +329,134 @@ export interface NfcBusinessProfile {
   createdAt: string;
   updatedAt: string;
 }
+
+// Chat types
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  type: "text" | "image" | "file" | "system";
+  metadata?: Record<string, any>;
+  edited: boolean;
+  editedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  description?: string;
+  participants: User[];
+  messages: ChatMessage[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Chat endpoints
+export async function apiCreateConversation(
+  title: string,
+  participantIds: string[],
+  description?: string,
+): Promise<ApiResponse<Conversation>> {
+  return apiRequest("/api/chat/conversations", {
+    method: "POST",
+    body: JSON.stringify({ title, participantIds, description }),
+  });
+}
+
+export async function apiListConversations(): Promise<
+  ApiResponse<Conversation[]>
+> {
+  return apiRequest("/api/chat/conversations", {
+    method: "GET",
+  });
+}
+
+export async function apiGetMessages(
+  conversationId: string,
+  limit: number = 50,
+  offset: number = 0,
+): Promise<ApiResponse<ChatMessage[]>> {
+  return apiRequest(
+    `/api/chat/conversations/${conversationId}/messages?limit=${limit}&offset=${offset}`,
+    {
+      method: "GET",
+    },
+  );
+}
+
+export async function apiSendMessage(
+  conversationId: string,
+  content: string,
+  type: "text" | "image" | "file" | "system" = "text",
+  metadata?: Record<string, any>,
+): Promise<ApiResponse<ChatMessage>> {
+  return apiRequest(`/api/chat/conversations/${conversationId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ content, type, metadata }),
+  });
+}
+
+export async function apiEditMessage(
+  conversationId: string,
+  messageId: string,
+  content: string,
+): Promise<ApiResponse<ChatMessage>> {
+  return apiRequest(
+    `/api/chat/conversations/${conversationId}/messages/${messageId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    },
+  );
+}
+
+export async function apiDeleteMessage(
+  conversationId: string,
+  messageId: string,
+): Promise<ApiResponse<null>> {
+  return apiRequest(
+    `/api/chat/conversations/${conversationId}/messages/${messageId}`,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
+export async function apiAddParticipant(
+  conversationId: string,
+  userId: string,
+): Promise<ApiResponse<Conversation>> {
+  return apiRequest(`/api/chat/conversations/${conversationId}/participants`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function apiLeaveConversation(
+  conversationId: string,
+): Promise<ApiResponse<null>> {
+  return apiRequest(`/api/chat/conversations/${conversationId}/leave`, {
+    method: "DELETE",
+  });
+}
+
+// WebSocket helper - export for real-time chat integration
+import { wsService } from "./websocketContext";
+
+export { wsService };
+
+// WebSocket integration example:
+// In components, use wsService for real-time updates:
+//
+// const unsubscribe = wsService.onMessage(conversationId, (message) => {
+//   // Handle new message
+// })
+//
+// wsService.sendMessage(conversationId, "Hello!")
+// wsService.startTyping(conversationId)
+// wsService.joinConversation(conversationId)

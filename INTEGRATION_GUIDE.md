@@ -84,9 +84,93 @@ Updated [Frontend/contexts/lib/auth.ts](Frontend/contexts/lib/auth.ts):
 - `apiDeleteNfcProfile(profileId)` → `DELETE /api/nfc/profile/:profileId` (Protected)
 - `apiCheckNfcSlugAvailability(slug)` → `GET /api/nfc/check-slug`
 
+#### Chat Endpoints ✨ NEW (2026)
+
+All chat endpoints require authentication:
+
+- `apiCreateConversation(title, participantIds, description?)` → `POST /api/chat/conversations`
+- `apiListConversations()` → `GET /api/chat/conversations`
+- `apiGetMessages(conversationId, limit, offset)` → `GET /api/chat/conversations/:conversationId/messages`
+- `apiSendMessage(conversationId, content, type?, metadata?)` → `POST /api/chat/conversations/:conversationId/messages`
+- `apiEditMessage(conversationId, messageId, content)` → `PUT /api/chat/conversations/:conversationId/messages/:messageId`
+- `apiDeleteMessage(conversationId, messageId)` → `DELETE /api/chat/conversations/:conversationId/messages/:messageId`
+- `apiAddParticipant(conversationId, userId)` → `POST /api/chat/conversations/:conversationId/participants`
+- `apiLeaveConversation(conversationId)` → `DELETE /api/chat/conversations/:conversationId/leave`
+
 ---
 
-## 🔐 Authentication Flow
+## 💬 Chat System Integration
+
+### Message Types & Structure
+
+Message types include:
+- `text`: Plain text message
+- `image`: Image attachment
+- `file`: File attachment
+- `system`: System message (auto-generated)
+
+### Conversation Usage
+
+```typescript
+import {
+  apiCreateConversation,
+  apiSendMessage,
+  apiListConversations
+} from "@/contexts/api";
+
+// Create a new conversation with participants
+const newConv = await apiCreateConversation(
+  "Team Discussion",
+  ["user-id-1", "user-id-2"],
+  "Discussing Q2 roadmap"
+);
+
+// Get all conversations for current user
+const conversations = await apiListConversations();
+
+// Get messages with pagination
+const messages = await apiGetMessages(conversationId, 50, 0);
+
+// Send a message
+const msg = await apiSendMessage(conversationId, "Hello team!");
+
+// Edit a message (sets edited=true)
+await apiEditMessage(conversationId, messageId, "Updated message");
+
+// Delete a message (soft delete via deletedAt)
+await apiDeleteMessage(conversationId, messageId);
+```
+
+### Message Types in TypeScript
+
+```typescript
+interface ChatMessage {
+  id: string
+  conversationId: string
+  senderId: string
+  content: string
+  type: "text" | "image" | "file" | "system"
+  metadata?: Record<string, any>
+  edited: boolean
+  editedAt?: string
+  createdAt: string
+  updatedAt: string
+  deletedAt?: string | null
+}
+
+interface Conversation {
+  id: string
+  title: string
+  description?: string
+  participants: User[]
+  messages: ChatMessage[]
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+}
+```
+
+---
 
 1. **Login/Register**: Credentials sent to backend
 2. **Token Receipt**: Backend returns JWT token
@@ -126,19 +210,27 @@ if (!response.success) {
 
 ## 📝 Next Steps
 
-1. **Update other lib files** to use API client:
-   - [Frontend/contexts/lib/loyaltyCard.ts](Frontend/contexts/lib/loyaltyCard.ts)
-   - [Frontend/contexts/lib/nfcProfile.ts](Frontend/contexts/lib/nfcProfile.ts)
-   - [Frontend/contexts/lib/adminAuth.ts](Frontend/contexts/lib/adminAuth.ts)
+1. **Update frontend components** to use new chat API:
+   - Create chat UI components
+   - Integrate message display
+   - Add conversation list
+   - Implement real-time message updates
 
-2. **Add more features**:
+2. **Add WebSocket support** (Optional but recommended):
+   - Install Socket.io: `npm install socket.io-client`
+   - Add WebSocket handler in backend
+   - Replace polling with real-time events for new messages
+
+3. **Add more features**:
    - NFC scanning and QR code reading
-   - Image uploads for profiles
+   - Image uploads for profiles & messages
    - Real-time notifications
+   - Typing indicators
+   - User presence
 
-3. **Add error boundaries** in components for better error handling
+4. **Add error boundaries** in components for better error handling
 
-4. **Implement request caching** using SWR hooks (already installed)
+5. **Implement request caching** using SWR hooks (already installed)
 
 ---
 
@@ -193,3 +285,5 @@ Try logging in with test credentials:
 ---
 
 Generated: April 2, 2026
+
+Updated: April 3, 2026 - Chat system added

@@ -1,14 +1,17 @@
 // Server entry point
-// Starts the Express application on the configured port
+// Starts the Express application on the configured port with WebSocket support
 
 require("dotenv").config();
 
+import { createServer } from "http";
 import app from "./app";
 import { PORT, NODE_ENV, BACKEND_URL } from "./config/env";
 import { initializeDb, cleanupDb } from "./config/db";
+import { WebSocketService } from "./services/websocketService";
 
 // Graceful shutdown
 let server: any;
+let wsService: WebSocketService;
 
 async function gracefulShutdown(signal: string) {
   console.log(`\n${signal} received. Starting graceful shutdown...`);
@@ -59,8 +62,14 @@ async function startServer() {
     console.log("🔌 Connecting to database...");
     await initializeDb();
 
-    // Start Express server
-    server = app.listen(PORT, () => {
+    // Create HTTP server for Express + Socket.io
+    server = createServer(app);
+
+    // Initialize WebSocket service
+    wsService = new WebSocketService(server);
+
+    // Start server
+    server.listen(PORT, () => {
       console.log(`
 ╔════════════════════════════════════════╗
 ║                                        ║
@@ -71,6 +80,7 @@ async function startServer() {
 📍 Server:      ${BACKEND_URL}
 ⚙️  Environment: ${NODE_ENV}
 📦 Port:        ${PORT}
+🔌 WebSocket:   Enabled
 ⏱️  Started:     ${new Date().toLocaleString()}
 
 Ready to accept connections! 🚀
@@ -85,5 +95,5 @@ Ready to accept connections! 🚀
 startServer();
 
 export default server;
-
+export { wsService };
 

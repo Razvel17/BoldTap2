@@ -1,6 +1,9 @@
-import type { Response } from "express";
-import type { AuthenticatedRequest } from "../middleware/authMiddleware";
+// Chat Controller
+// Handles all chat-related endpoints for conversations and messages
+
+import { Response } from "express";
 import * as chatService from "../services/chatService";
+import { AuthenticatedRequest } from "../middleware/authMiddleware";
 import { sendSuccess, sendError } from "../utils/errors";
 
 export async function createConversation(
@@ -13,23 +16,19 @@ export async function createConversation(
     if (!title || !participantIds || !Array.isArray(participantIds)) {
       return sendError(
         res,
-        "Title and participant IDs required",
+        "Title and participant IDs array required",
         400,
       );
     }
 
-    const result = await chatService.createConversation(
-      req.user!.userId,
+    const result = await chatService.createConversation({
       title,
-      participantIds,
+      participantIds: [req.user!.userId, ...participantIds],
       description,
-    );
+      createdBy: req.user!.userId,
+    });
 
-    if (!result.success) {
-      return sendError(res, result.error || "Failed to create conversation", 400);
-    }
-
-    return sendSuccess(res, { conversation: result.conversation });
+    return sendSuccess(res, result);
   } catch (error) {
     return sendError(res, error as Error);
   }
@@ -40,13 +39,10 @@ export async function listConversations(
   res: Response,
 ): Promise<Response | void> {
   try {
-    const result = await chatService.getConversations(req.user!.userId);
-
-    if (!result.success) {
-      return sendError(res, result.error || "Failed to fetch conversations", 400);
-    }
-
-    return sendSuccess(res, { conversations: result.conversations });
+    const conversations = await chatService.listConversations(
+      req.user!.userId,
+    );
+    return sendSuccess(res, { conversations });
   } catch (error) {
     return sendError(res, error as Error);
   }
@@ -57,23 +53,16 @@ export async function getMessages(
   res: Response,
 ): Promise<Response | void> {
   try {
-    const conversationId = Array.isArray(req.params.conversationId)
-      ? (req.params.conversationId as any)[0]
-      : (req.params.conversationId as string);
-    const { limit = 50, offset = 0 } = req.query;
+    const { conversationId } = req.params as { conversationId: string };
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const offset = parseInt(req.query.offset as string) || 0;
 
-    const result = await chatService.getConversationMessages(
+    const messages = await chatService.getMessages(
       conversationId,
-      req.user!.userId,
-      Number(limit),
-      Number(offset),
+      limit,
+      offset,
     );
-
-    if (!result.success) {
-      return sendError(res, result.error || "Failed to fetch messages", 400);
-    }
-
-    return sendSuccess(res, { messages: result.messages });
+    return sendSuccess(res, { messages });
   } catch (error) {
     return sendError(res, error as Error);
   }
@@ -84,28 +73,22 @@ export async function sendMessage(
   res: Response,
 ): Promise<Response | void> {
   try {
-    const conversationId = Array.isArray(req.params.conversationId)
-      ? (req.params.conversationId as any)[0]
-      : (req.params.conversationId as string);
-    const { content, type = "text", metadata } = req.body;
+    const { conversationId } = req.params as { conversationId: string };
+    const { content, type, metadata } = req.body;
 
     if (!content) {
       return sendError(res, "Message content required", 400);
     }
 
-    const result = await chatService.sendMessage(
+    const message = await chatService.sendMessage({
       conversationId,
-      req.user!.userId,
+      senderId: req.user!.userId,
       content,
-      type,
+      type: type || "text",
       metadata,
-    );
+    });
 
-    if (!result.success) {
-      return sendError(res, result.error || "Failed to send message", 400);
-    }
-
-    return sendSuccess(res, { message: result.message });
+    return sendSuccess(res, message);
   } catch (error) {
     return sendError(res, error as Error);
   }
@@ -116,26 +99,24 @@ export async function editMessage(
   res: Response,
 ): Promise<Response | void> {
   try {
-    const messageId = Array.isArray(req.params.messageId)
-      ? (req.params.messageId as any)[0]
-      : (req.params.messageId as string);
+    const { conversationId, messageId } = req.params as {
+      conversationId: string;
+      messageId: string;
+    };
     const { content } = req.body;
 
     if (!content) {
-      return sendError(res, "Message content required", 400);
+      return sendError(res, "Updated content required", 400);
     }
 
-    const result = await chatService.editMessage(
+    const message = await chatService.editMessage(
       messageId,
+      conversationId,
       req.user!.userId,
       content,
     );
 
-    if (!result.success) {
-      return sendError(res, result.error || "Failed to edit message", 400);
-    }
-
-    return sendSuccess(res, { message: result.message });
+    return sendSuccess(res, message);
   } catch (error) {
     return sendError(res, error as Error);
   }
@@ -146,15 +127,16 @@ export async function deleteMessage(
   res: Response,
 ): Promise<Response | void> {
   try {
-    const messageId = Array.isArray(req.params.messageId)
-      ? (req.params.messageId as any)[0]
-      : (req.params.messageId as string);
+    const { conversationId, messageId } = req.params as {
+      conversationId: string;
+      messageId: string;
+    };
 
-    const result = await chatService.deleteMessage(messageId, req.user!.userId);
-
-    if (!result.success) {
-      return sendError(res, result.error || "Failed to delete message", 400);
-    }
+    await chatService.deleteMessage(
+      messageId,
+      conversationId,
+      req.user!.userId,
+    );
 
     return sendSuccess(res, { message: "Message deleted" });
   } catch (error) {
@@ -167,26 +149,20 @@ export async function addParticipant(
   res: Response,
 ): Promise<Response | void> {
   try {
-    const conversationId = Array.isArray(req.params.conversationId)
-      ? (req.params.conversationId as any)[0]
-      : (req.params.conversationId as string);
+    const { conversationId } = req.params as { conversationId: string };
     const { userId } = req.body;
 
     if (!userId) {
       return sendError(res, "User ID required", 400);
     }
 
-    const result = await chatService.addParticipant(
+    const conversation = await chatService.addParticipant(
       conversationId,
       userId,
       req.user!.userId,
     );
 
-    if (!result.success) {
-      return sendError(res, result.error || "Failed to add participant", 400);
-    }
-
-    return sendSuccess(res, { conversation: result.conversation });
+    return sendSuccess(res, conversation);
   } catch (error) {
     return sendError(res, error as Error);
   }
@@ -197,18 +173,9 @@ export async function leaveConversation(
   res: Response,
 ): Promise<Response | void> {
   try {
-    const conversationId = Array.isArray(req.params.conversationId)
-      ? (req.params.conversationId as any)[0]
-      : (req.params.conversationId as string);
+    const { conversationId } = req.params as { conversationId: string };
 
-    const result = await chatService.leaveConversation(
-      conversationId,
-      req.user!.userId,
-    );
-
-    if (!result.success) {
-      return sendError(res, result.error || "Failed to leave conversation", 400);
-    }
+    await chatService.leaveConversation(conversationId, req.user!.userId);
 
     return sendSuccess(res, { message: "Left conversation" });
   } catch (error) {
