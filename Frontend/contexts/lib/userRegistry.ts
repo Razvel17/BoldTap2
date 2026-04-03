@@ -97,10 +97,20 @@ export function setUserPaymentStatus(
   writeRawUsers(users);
 }
 
-export function syncAcquiredService(
-  userId: string,
-  service: ServiceId,
-): void {
+export function deleteUser(userId: string): void {
+  const users = readRawUsers();
+  const remaining = users.filter((u) => u.id !== userId);
+  if (remaining.length === users.length) return;
+  writeRawUsers(remaining);
+}
+
+export function addUser(user: AccountRecord): void {
+  const users = readRawUsers().filter((u) => u.id !== user.id);
+  users.push(user);
+  writeRawUsers(users);
+}
+
+export function syncAcquiredService(userId: string, service: ServiceId): void {
   const users = readRawUsers();
   const idx = users.findIndex((u) => u.id === userId);
   if (idx === -1) return;

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Navigation from "@/components/Navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import DashboardSidebar from "@/components/DashboardSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import LoyaltyCard from "@/components/LoyaltyCard";
 import {
@@ -149,35 +150,11 @@ export default function LoyaltyDashboardPage() {
               Loyalty card
             </p>
             <div className="grid lg:grid-cols-4 gap-8">
-              <motion.aside
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5 }}
-                className="lg:col-span-1"
-              >
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                  <nav className="space-y-2">
-                    {menuItems.map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setActiveTab(item.id)}
-                          className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                            activeTab === item.id
-                              ? "bg-black text-white"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }`}
-                        >
-                          <Icon className="w-5 h-5" />
-                          <span className="font-medium">{item.label}</span>
-                        </button>
-                      );
-                    })}
-                  </nav>
-                </div>
-              </motion.aside>
+              <DashboardSidebar
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                menuItems={menuItems}
+              />
 
               <div className="lg:col-span-3">
                 {activeTab === "program" && (
@@ -188,7 +165,9 @@ export default function LoyaltyDashboardPage() {
                   >
                     <div className="flex items-center justify-between mb-6">
                       <div>
-                        <h2 className="text-3xl font-bold text-black mb-2">Your Loyalty Card</h2>
+                        <h2 className="text-3xl font-bold text-black mb-2">
+                          Your Loyalty Card
+                        </h2>
                         <p className="text-gray-600">
                           {cardData
                             ? "Manage your card and collect stamps"
@@ -237,7 +216,10 @@ export default function LoyaltyDashboardPage() {
                             type="text"
                             value={editForm.cardName}
                             onChange={(e) =>
-                              setEditForm({ ...editForm, cardName: e.target.value })
+                              setEditForm({
+                                ...editForm,
+                                cardName: e.target.value,
+                              })
                             }
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
                           />
@@ -250,7 +232,10 @@ export default function LoyaltyDashboardPage() {
                             type="text"
                             value={editForm.businessName}
                             onChange={(e) =>
-                              setEditForm({ ...editForm, businessName: e.target.value })
+                              setEditForm({
+                                ...editForm,
+                                businessName: e.target.value,
+                              })
                             }
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
                           />
@@ -262,7 +247,10 @@ export default function LoyaltyDashboardPage() {
                           <textarea
                             value={editForm.description}
                             onChange={(e) =>
-                              setEditForm({ ...editForm, description: e.target.value })
+                              setEditForm({
+                                ...editForm,
+                                description: e.target.value,
+                              })
                             }
                             rows={2}
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none resize-none"
@@ -280,7 +268,10 @@ export default function LoyaltyDashboardPage() {
                             onChange={(e) =>
                               setEditForm({
                                 ...editForm,
-                                stampGoal: Math.max(5, Math.min(20, parseInt(e.target.value) || 10)),
+                                stampGoal: Math.max(
+                                  5,
+                                  Math.min(20, parseInt(e.target.value) || 10),
+                                ),
                               })
                             }
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
@@ -297,7 +288,10 @@ export default function LoyaltyDashboardPage() {
                             type="text"
                             value={editForm.rewardTitle}
                             onChange={(e) =>
-                              setEditForm({ ...editForm, rewardTitle: e.target.value })
+                              setEditForm({
+                                ...editForm,
+                                rewardTitle: e.target.value,
+                              })
                             }
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
                           />
@@ -347,8 +341,8 @@ export default function LoyaltyDashboardPage() {
                               Share your loyalty program
                             </p>
                             <p className="text-xs text-gray-600 mb-3">
-                              Customers open this link to save their card. Stamps
-                              are updated from the Members tab.
+                              Customers open this link to save their card.
+                              Stamps are updated from the Members tab.
                             </p>
                             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                               <code className="text-xs bg-white border border-gray-200 rounded-lg px-3 py-2 break-all flex-1">
@@ -398,7 +392,9 @@ export default function LoyaltyDashboardPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-white rounded-xl shadow-sm border border-gray-200 p-8"
                   >
-                    <h2 className="text-3xl font-bold text-black mb-2">Members</h2>
+                    <h2 className="text-3xl font-bold text-black mb-2">
+                      Members
+                    </h2>
                     <p className="text-gray-600 mb-6">
                       Everyone who joined via your share link. Add stamps when
                       they make a qualifying visit.
@@ -448,7 +444,9 @@ export default function LoyaltyDashboardPage() {
                                   <div className="flex items-center gap-2">
                                     <button
                                       type="button"
-                                      onClick={() => bumpCustomerStamps(c.id, -1)}
+                                      onClick={() =>
+                                        bumpCustomerStamps(c.id, -1)
+                                      }
                                       className="w-9 h-9 rounded-lg border border-gray-200 hover:bg-gray-50 text-lg leading-none"
                                       aria-label="Remove one stamp"
                                     >
@@ -456,7 +454,9 @@ export default function LoyaltyDashboardPage() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => bumpCustomerStamps(c.id, 1)}
+                                      onClick={() =>
+                                        bumpCustomerStamps(c.id, 1)
+                                      }
                                       className="w-9 h-9 rounded-lg bg-black text-white hover:bg-gray-800 text-lg leading-none"
                                       aria-label="Add one stamp"
                                     >
@@ -479,18 +479,26 @@ export default function LoyaltyDashboardPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-white rounded-xl shadow-sm border border-gray-200 p-8"
                   >
-                    <h2 className="text-3xl font-bold text-black mb-6">Analytics</h2>
+                    <h2 className="text-3xl font-bold text-black mb-6">
+                      Analytics
+                    </h2>
                     <div className="grid md:grid-cols-3 gap-6">
                       <div className="p-6 bg-gray-50 rounded-lg">
-                        <p className="text-gray-600 text-sm mb-2">Active members</p>
+                        <p className="text-gray-600 text-sm mb-2">
+                          Active members
+                        </p>
                         <p className="text-3xl font-bold text-black">428</p>
                       </div>
                       <div className="p-6 bg-gray-50 rounded-lg">
-                        <p className="text-gray-600 text-sm mb-2">Stamps this month</p>
+                        <p className="text-gray-600 text-sm mb-2">
+                          Stamps this month
+                        </p>
                         <p className="text-3xl font-bold text-black">1,902</p>
                       </div>
                       <div className="p-6 bg-gray-50 rounded-lg">
-                        <p className="text-gray-600 text-sm mb-2">Rewards redeemed</p>
+                        <p className="text-gray-600 text-sm mb-2">
+                          Rewards redeemed
+                        </p>
                         <p className="text-3xl font-bold text-black">74</p>
                       </div>
                     </div>
@@ -507,15 +515,28 @@ export default function LoyaltyDashboardPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-white rounded-xl shadow-sm border border-gray-200 p-8"
                   >
-                    <h2 className="text-3xl font-bold text-black mb-6">Settings</h2>
+                    <h2 className="text-3xl font-bold text-black mb-6">
+                      Settings
+                    </h2>
                     <div className="space-y-4 max-w-lg">
                       <label className="flex items-center justify-between gap-4 p-4 border border-gray-200 rounded-lg">
-                        <span className="text-gray-800">Double stamps on birthdays</span>
-                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300" />
+                        <span className="text-gray-800">
+                          Double stamps on birthdays
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
                       </label>
                       <label className="flex items-center justify-between gap-4 p-4 border border-gray-200 rounded-lg">
-                        <span className="text-gray-800">Notify members when close to reward</span>
-                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300" defaultChecked />
+                        <span className="text-gray-800">
+                          Notify members when close to reward
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gray-300"
+                          defaultChecked
+                        />
                       </label>
                     </div>
                   </motion.div>

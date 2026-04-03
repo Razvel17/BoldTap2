@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -15,8 +15,11 @@ import ProtectedAdminRoute from "@/components/ProtectedAdminRoute";
 import {
   listUsersForAdmin,
   setUserPaymentStatus,
+  deleteUser,
+  addUser,
+  readRawUsers,
 } from "@/contexts/lib/userRegistry";
-import type { PaymentStatus } from "@/contexts/lib/userRegistry";
+import type { AccountRecord, PaymentStatus } from "@/contexts/lib/userRegistry";
 import type { ServiceId } from "@/contexts/lib/service";
 import { logoutAdmin } from "@/contexts/lib/adminAuth";
 import { useRouter } from "next/navigation";
@@ -41,6 +44,10 @@ export default function AdminDashboardPage() {
   const router = useRouter();
   const [rows, setRows] = useState(listUsersForAdmin());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [pendingDeletedUser, setPendingDeletedUser] = useState<AccountRecord | null>(null);
+  const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
+  const [snackbarActionLabel, setSnackbarActionLabel] = useState<string | null>(null);
+  const snackbarTimer = useRef<number | null>(null);
 
   const refresh = useCallback(() => {
     setRows(listUsersForAdmin());
@@ -48,10 +55,14 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     refresh();
+    return () => {
+      if (snackbarTimer.current) {
+        window.clearTimeout(snackbarTimer.current);
+      }
+    };
   }, [refresh]);
 
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   const copyNfcLink = async (slug: string, userId: string) => {
     const url = `${origin}/c/${slug}`;
@@ -66,6 +77,46 @@ export default function AdminDashboardPage() {
 
   const onPaymentChange = (userId: string, value: PaymentStatus) => {
     setUserPaymentStatus(userId, value);
+    refresh();
+  };
+
+  const clearSnackbar = () => {
+    setSnackbarMessage(null);
+    setSnackbarActionLabel(null);
+    if (snackbarTimer.current) {
+      window.clearTimeout(snackbarTimer.current);
+      snackbarTimer.current = null;
+    }
+  };
+
+  const onUndoDelete = () => {
+    if (!pendingDeletedUser) return;
+    addUser(pendingDeletedUser);
+    setPendingDeletedUser(null);
+    clearSnackbar();
+    refresh();
+  };
+
+  const onDeleteUser = (userId: string) => {
+    if (!window.confirm("Delete this user account? This cannot be undone.")) {
+      return;
+    }
+    const deleted = readRawUsers().find((u) => u.id === userId);
+    if (!deleted) return;
+
+    deleteUser(userId);
+    setPendingDeletedUser(deleted);
+    setSnackbarMessage("User deleted");
+    setSnackbarActionLabel("Undo");
+
+    if (snackbarTimer.current) {
+      window.clearTimeout(snackbarTimer.current);
+    }
+    snackbarTimer.current = window.setTimeout(() => {
+      clearSnackbar();
+      setPendingDeletedUser(null);
+    }, 5000);
+
     refresh();
   };
 
@@ -130,18 +181,21 @@ export default function AdminDashboardPage() {
                       <th className="px-4 py-3 font-semibold">Email</th>
                       <th className="px-4 py-3 font-semibold">Service</th>
                       <th className="px-4 py-3 font-semibold">Payment</th>
-                      <th className="px-4 py-3 font-semibold">NFC public link</th>
+                      <th className="px-4 py-3 font-semibold">
+                        NFC public link
+                      </th>
+                      <th className="px-4 py-3 font-semibold">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {rows.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={6}
                           className="px-4 py-12 text-center text-gray-500"
                         >
-                          No accounts yet. User data is stored in this
-                          browser (local demo).
+                          No accounts yet. User data is stored in this browser
+                          (local demo).
                         </td>
                       </tr>
                     ) : (
@@ -216,6 +270,15 @@ export default function AdminDashboardPage() {
                                 <span className="text-gray-400">—</span>
                               )}
                             </td>
+                            <td className="px-4 py-3">
+                              <button
+                                type="button"
+                                onClick={() => onDeleteUser(u.id)}
+                                className="inline-flex items-center space-x-2 px-2 py-1 rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                              >
+                                Delete
+                              </button>
+                            </td>
                           </tr>
                         );
                       })
@@ -225,6 +288,27 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </motion.div>
+          {snackbarMessage && (
+            <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-3 rounded-lg shadow-lg bg-gray-900 text-white flex items-center gap-3 z-50">
+              <span className="text-sm">{snackbarMessage}</span>
+              {snackbarActionLabel && (
+                <button
+                  type="button"
+                  onClick={onUndoDelete}
+                  className="text-sm font-semibold text-cyan-300 hover:text-white"
+                >
+                  {snackbarActionLabel}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={clearSnackbar}
+                className="text-sm font-medium text-gray-300 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+          )}
         </main>
       </div>
     </ProtectedAdminRoute>

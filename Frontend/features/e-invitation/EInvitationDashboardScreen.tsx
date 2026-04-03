@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import Navigation from "@/components/Navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import DashboardSidebar from "@/components/DashboardSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   MailOpen,
@@ -37,35 +38,11 @@ export default function EInvitationDashboardPage() {
               E-invitation card
             </p>
             <div className="grid lg:grid-cols-4 gap-8">
-              <motion.aside
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5 }}
-                className="lg:col-span-1"
-              >
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                  <nav className="space-y-2">
-                    {menuItems.map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setActiveTab(item.id)}
-                          className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                            activeTab === item.id
-                              ? "bg-black text-white"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }`}
-                        >
-                          <Icon className="w-5 h-5" />
-                          <span className="font-medium">{item.label}</span>
-                        </button>
-                      );
-                    })}
-                  </nav>
-                </div>
-              </motion.aside>
+              <DashboardSidebar
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                menuItems={menuItems}
+              />
 
               <div className="lg:col-span-3">
                 {activeTab === "events" && (
@@ -76,9 +53,12 @@ export default function EInvitationDashboardPage() {
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
                       <div>
-                        <h2 className="text-3xl font-bold text-black mb-2">Your events</h2>
+                        <h2 className="text-3xl font-bold text-black mb-2">
+                          Your events
+                        </h2>
                         <p className="text-gray-600">
-                          Create and manage digital invitations with RSVP tracking.
+                          Create and manage digital invitations with RSVP
+                          tracking.
                         </p>
                       </div>
                       <button
@@ -96,7 +76,9 @@ export default function EInvitationDashboardPage() {
                             <MailOpen className="w-6 h-6" />
                           </div>
                           <div>
-                            <h3 className="text-lg font-bold text-black">Spring launch party</h3>
+                            <h3 className="text-lg font-bold text-black">
+                              Spring launch party
+                            </h3>
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 mt-1">
                               <span className="inline-flex items-center">
                                 <Calendar className="w-4 h-4 mr-1" />
@@ -111,7 +93,9 @@ export default function EInvitationDashboardPage() {
                         </div>
                         <div className="text-left md:text-right">
                           <p className="text-sm text-gray-500">RSVPs</p>
-                          <p className="text-2xl font-bold text-black">86 / 120</p>
+                          <p className="text-2xl font-bold text-black">
+                            86 / 120
+                          </p>
                         </div>
                       </div>
                       <div className="border border-dashed border-gray-300 rounded-xl p-8 text-center text-gray-500">
@@ -128,7 +112,9 @@ export default function EInvitationDashboardPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-white rounded-xl shadow-sm border border-gray-200 p-8"
                   >
-                    <h2 className="text-3xl font-bold text-black mb-6">Guests & RSVPs</h2>
+                    <h2 className="text-3xl font-bold text-black mb-6">
+                      Guests & RSVPs
+                    </h2>
                     <p className="text-gray-600 mb-6">
                       {user?.name ? `${user.name}, ` : ""}
                       see who opened your invite and their response.
@@ -149,9 +135,15 @@ export default function EInvitationDashboardPage() {
                             { name: "Alex M.", status: "Declined", plus: 0 },
                           ].map((row) => (
                             <tr key={row.name}>
-                              <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
-                              <td className="px-4 py-3 text-gray-700">{row.status}</td>
-                              <td className="px-4 py-3 text-gray-700">{row.plus}</td>
+                              <td className="px-4 py-3 font-medium text-gray-900">
+                                {row.name}
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">
+                                {row.status}
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">
+                                {row.plus}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -166,10 +158,14 @@ export default function EInvitationDashboardPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-white rounded-xl shadow-sm border border-gray-200 p-8"
                   >
-                    <h2 className="text-3xl font-bold text-black mb-6">Analytics</h2>
+                    <h2 className="text-3xl font-bold text-black mb-6">
+                      Analytics
+                    </h2>
                     <div className="grid md:grid-cols-3 gap-6">
                       <div className="p-6 bg-gray-50 rounded-lg">
-                        <p className="text-gray-600 text-sm mb-2">Invite opens</p>
+                        <p className="text-gray-600 text-sm mb-2">
+                          Invite opens
+                        </p>
                         <p className="text-3xl font-bold text-black">3.4k</p>
                       </div>
                       <div className="p-6 bg-gray-50 rounded-lg">
@@ -190,15 +186,28 @@ export default function EInvitationDashboardPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-white rounded-xl shadow-sm border border-gray-200 p-8"
                   >
-                    <h2 className="text-3xl font-bold text-black mb-6">Settings</h2>
+                    <h2 className="text-3xl font-bold text-black mb-6">
+                      Settings
+                    </h2>
                     <div className="space-y-4 max-w-lg">
                       <label className="flex items-center justify-between gap-4 p-4 border border-gray-200 rounded-lg">
-                        <span className="text-gray-800">Send reminder 3 days before</span>
-                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300" defaultChecked />
+                        <span className="text-gray-800">
+                          Send reminder 3 days before
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gray-300"
+                          defaultChecked
+                        />
                       </label>
                       <label className="flex items-center justify-between gap-4 p-4 border border-gray-200 rounded-lg">
-                        <span className="text-gray-800">Collect dietary preferences</span>
-                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300" />
+                        <span className="text-gray-800">
+                          Collect dietary preferences
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
                       </label>
                     </div>
                   </motion.div>

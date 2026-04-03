@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Navigation from "@/components/Navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import DashboardSidebar from "@/components/DashboardSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   User,
@@ -27,42 +28,7 @@ type EditableProfileData = NfcProfileData & {
   profilePicture: null;
 };
 
-// Memoized sidebar component
-function Sidebar({
-  activeTab,
-  setActiveTab,
-  menuItems,
-}: {
-  activeTab: string;
-  setActiveTab: (id: string) => void;
-  menuItems: { id: string; label: string; icon: React.ComponentType<{ className?: string }> }[];
-}) {
-  return (
-    <aside className="lg:col-span-1">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <nav className="space-y-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                  activeTab === item.id
-                    ? "bg-black text-white"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="font-medium">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-    </aside>
-  );
-}
+// NOTE: Sidebar handled by shared component
 
 // Memoized tab components
 function ProfileTab({ profileData }: { profileData: EditableProfileData }) {
@@ -75,7 +41,9 @@ function ProfileTab({ profileData }: { profileData: EditableProfileData }) {
             <User className="w-12 h-12 text-gray-400" />
           </div>
           <div>
-            <h3 className="text-2xl font-bold text-black">{profileData.name}</h3>
+            <h3 className="text-2xl font-bold text-black">
+              {profileData.name}
+            </h3>
             <p className="text-gray-600">{profileData.title}</p>
             <p className="text-gray-500">{profileData.company}</p>
           </div>
@@ -148,7 +116,8 @@ function PreviewTab({
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
       <h2 className="text-3xl font-bold text-black mb-6">Card Preview</h2>
       <p className="text-sm text-gray-600 mb-6 max-w-lg">
-        This matches what visitors see when they open your digital card. Empty fields are hidden automatically.
+        This matches what visitors see when they open your digital card. Empty
+        fields are hidden automatically.
       </p>
       <div className="flex justify-center rounded-xl bg-[#f0ebe8] p-6">
         <NfcBusinessCardView
@@ -168,7 +137,9 @@ function SettingsTab() {
       <h2 className="text-3xl font-bold text-black mb-6">Settings</h2>
       <div className="space-y-6">
         <div>
-          <h3 className="text-lg font-semibold text-black mb-4">Account Settings</h3>
+          <h3 className="text-lg font-semibold text-black mb-4">
+            Account Settings
+          </h3>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -196,14 +167,24 @@ function SettingsTab() {
           </div>
         </div>
         <div className="pt-6 border-t border-gray-200">
-          <h3 className="text-lg font-semibold text-black mb-4">Notifications</h3>
+          <h3 className="text-lg font-semibold text-black mb-4">
+            Notifications
+          </h3>
           <div className="space-y-3">
             <label className="flex items-center">
-              <input type="checkbox" className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black" defaultChecked />
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black"
+                defaultChecked
+              />
               <span className="ml-2 text-gray-700">Email notifications</span>
             </label>
             <label className="flex items-center">
-              <input type="checkbox" className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black" defaultChecked />
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black"
+                defaultChecked
+              />
               <span className="ml-2 text-gray-700">SMS notifications</span>
             </label>
           </div>
@@ -250,18 +231,21 @@ export default function DashboardPage() {
     });
   }, [user?.id, user?.name, user?.email, user?.phone]);
 
-  const previewProfile = useMemo((): NfcProfileData => ({
-    name: profileData.name,
-    title: profileData.title,
-    company: profileData.company,
-    phones: profileData.phones,
-    emails: profileData.emails,
-    website: profileData.website,
-    socialLinks: profileData.socialLinks,
-    about: profileData.about || undefined,
-    bannerImageUrl: profileData.bannerImageUrl || undefined,
-    profileImageUrl: profileData.profileImageUrl || undefined,
-  }), [profileData]);
+  const previewProfile = useMemo(
+    (): NfcProfileData => ({
+      name: profileData.name,
+      title: profileData.title,
+      company: profileData.company,
+      phones: profileData.phones,
+      emails: profileData.emails,
+      website: profileData.website,
+      socialLinks: profileData.socialLinks,
+      about: profileData.about || undefined,
+      bannerImageUrl: profileData.bannerImageUrl || undefined,
+      profileImageUrl: profileData.profileImageUrl || undefined,
+    }),
+    [profileData],
+  );
 
   const handleSaveProfile = useCallback(() => {
     if (!user?.id) return;
@@ -270,10 +254,13 @@ export default function DashboardPage() {
     window.setTimeout(() => setSaveNotice(false), 2500);
   }, [user?.id, previewProfile]);
 
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setProfileData((prev) => ({ ...prev, [name]: value }));
-  }, []);
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value } = e.target;
+      setProfileData((prev) => ({ ...prev, [name]: value }));
+    },
+    [],
+  );
 
   const readImageFileAsDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -285,31 +272,33 @@ export default function DashboardPage() {
 
   const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
-  const handleProfileImageFileChange = useCallback(async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > MAX_IMAGE_BYTES) {
-      console.error("Profile image too large (max 2MB).");
-      return;
-    }
-    const dataUrl = await readImageFileAsDataUrl(file);
-    setProfileData((prev) => ({ ...prev, profileImageUrl: dataUrl }));
-  }, []);
+  const handleProfileImageFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > MAX_IMAGE_BYTES) {
+        console.error("Profile image too large (max 2MB).");
+        return;
+      }
+      const dataUrl = await readImageFileAsDataUrl(file);
+      setProfileData((prev) => ({ ...prev, profileImageUrl: dataUrl }));
+    },
+    [],
+  );
 
-  const handleBannerImageFileChange = useCallback(async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > MAX_IMAGE_BYTES) {
-      console.error("Banner image too large (max 2MB).");
-      return;
-    }
-    const dataUrl = await readImageFileAsDataUrl(file);
-    setProfileData((prev) => ({ ...prev, bannerImageUrl: dataUrl }));
-  }, []);
+  const handleBannerImageFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > MAX_IMAGE_BYTES) {
+        console.error("Banner image too large (max 2MB).");
+        return;
+      }
+      const dataUrl = await readImageFileAsDataUrl(file);
+      setProfileData((prev) => ({ ...prev, bannerImageUrl: dataUrl }));
+    },
+    [],
+  );
 
   const handlePhoneChange = useCallback((index: number, value: string) => {
     setProfileData((prev) => {
@@ -351,18 +340,17 @@ export default function DashboardPage() {
     });
   }, []);
 
-  const handleSocialChange = useCallback((
-    id: string,
-    field: "label" | "url",
-    value: string
-  ) => {
-    setProfileData((prev) => {
-      const socialLinks = prev.socialLinks.map((social) =>
-        social.id === id ? { ...social, [field]: value } : social
-      );
-      return { ...prev, socialLinks };
-    });
-  }, []);
+  const handleSocialChange = useCallback(
+    (id: string, field: "label" | "url", value: string) => {
+      setProfileData((prev) => {
+        const socialLinks = prev.socialLinks.map((social) =>
+          social.id === id ? { ...social, [field]: value } : social,
+        );
+        return { ...prev, socialLinks };
+      });
+    },
+    [],
+  );
 
   const addSocial = useCallback(() => {
     setProfileData((prev) => ({
@@ -384,13 +372,16 @@ export default function DashboardPage() {
     }));
   }, []);
 
-  const menuItems = useMemo(() => [
-    { id: "profile", label: "My Profile", icon: User },
-    { id: "edit", label: "Edit Information", icon: Edit3 },
-    { id: "analytics", label: "Analytics / Leads", icon: BarChart3 },
-    { id: "preview", label: "Card Preview", icon: CreditCard },
-    { id: "settings", label: "Settings", icon: Settings },
-  ], []);
+  const menuItems = useMemo(
+    () => [
+      { id: "profile", label: "My Profile", icon: User },
+      { id: "edit", label: "Edit Information", icon: Edit3 },
+      { id: "analytics", label: "Analytics / Leads", icon: BarChart3 },
+      { id: "preview", label: "Card Preview", icon: CreditCard },
+      { id: "settings", label: "Settings", icon: Settings },
+    ],
+    [],
+  );
 
   return (
     <ProtectedRoute>
@@ -402,20 +393,24 @@ export default function DashboardPage() {
               NFC Business card
             </p>
             <div className="grid lg:grid-cols-4 gap-8">
-              <Sidebar
+              <DashboardSidebar
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
                 menuItems={menuItems}
               />
 
               <div className="lg:col-span-3">
-                {activeTab === "profile" && <ProfileTab profileData={profileData} />}
+                {activeTab === "profile" && (
+                  <ProfileTab profileData={profileData} />
+                )}
 
                 {activeTab === "edit" && (
                   <div className="grid lg:grid-cols-2 gap-8">
                     {/* Edit Form */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-                      <h2 className="text-3xl font-bold text-black mb-6">Edit Information</h2>
+                      <h2 className="text-3xl font-bold text-black mb-6">
+                        Edit Information
+                      </h2>
                       <form className="space-y-5">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -478,7 +473,10 @@ export default function DashboardPage() {
                           </label>
                           <div className="space-y-3">
                             {profileData.phones.map((phone, index) => (
-                              <div key={index} className="flex items-center space-x-2">
+                              <div
+                                key={index}
+                                className="flex items-center space-x-2"
+                              >
                                 <input
                                   type="tel"
                                   value={phone}
@@ -518,7 +516,10 @@ export default function DashboardPage() {
                           </label>
                           <div className="space-y-3">
                             {profileData.emails.map((email, index) => (
-                              <div key={index} className="flex items-center space-x-2">
+                              <div
+                                key={index}
+                                className="flex items-center space-x-2"
+                              >
                                 <input
                                   type="email"
                                   value={email}
@@ -647,7 +648,7 @@ export default function DashboardPage() {
                                       handleSocialChange(
                                         social.id,
                                         "label",
-                                        e.target.value
+                                        e.target.value,
                                       )
                                     }
                                     placeholder="Label (e.g. LinkedIn)"
@@ -660,7 +661,7 @@ export default function DashboardPage() {
                                       handleSocialChange(
                                         social.id,
                                         "url",
-                                        e.target.value
+                                        e.target.value,
                                       )
                                     }
                                     placeholder="https://"
@@ -707,7 +708,9 @@ export default function DashboardPage() {
 
                     {/* Live Preview */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:p-8">
-                      <h3 className="text-xl font-bold text-black mb-6">Live Preview</h3>
+                      <h3 className="text-xl font-bold text-black mb-6">
+                        Live Preview
+                      </h3>
                       <div className="rounded-xl bg-[#f0ebe8] p-4 sm:p-6">
                         <NfcBusinessCardView
                           profile={previewProfile}
