@@ -44,9 +44,12 @@ export default function AdminDashboardPage() {
   const router = useRouter();
   const [rows, setRows] = useState(listUsersForAdmin());
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [pendingDeletedUser, setPendingDeletedUser] = useState<AccountRecord | null>(null);
+  const [pendingDeletedUser, setPendingDeletedUser] =
+    useState<AccountRecord | null>(null);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
-  const [snackbarActionLabel, setSnackbarActionLabel] = useState<string | null>(null);
+  const [snackbarActionLabel, setSnackbarActionLabel] = useState<string | null>(
+    null,
+  );
   const snackbarTimer = useRef<number | null>(null);
 
   const refresh = useCallback(() => {
