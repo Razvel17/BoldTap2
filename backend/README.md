@@ -41,6 +41,15 @@ Complete backend for the BoldTap loyalty card, NFC business card, auth, chat, we
 - Provider callback handling
 - Payment status tracking and purchase history
 
+✅ **Credit Card Payments (Stripe)**
+
+- Visa, Mastercard, Amex, and all major card types
+- One-time payments and recurring subscriptions
+- Saved payment methods for repeat customers
+- Automatic payment retry logic
+- PCI Level 1 compliant (secure token handling)
+- Real-time webhook synchronization
+
 ✅ **Database Agnostic**
 
 - In-memory database for development (no setup needed)
@@ -80,15 +89,28 @@ MPESA_STATUS_URL=
 MPESA_API_KEY=
 MPESA_BUSINESS_ID=
 
-YAS_API_URL=
-YAS_STATUS_URL=
-YAS_API_KEY=
-YAS_BUSINESS_ID=
+MIXX_BY_YAS_API_URL=
+MIXX_BY_YAS_STATUS_URL=
+MIXX_BY_YAS_API_KEY=
+MIXX_BY_YAS_BUSINESS_ID=
 
 AIRTEL_MONEY_API_URL=
 AIRTEL_MONEY_STATUS_URL=
 AIRTEL_MONEY_API_KEY=
 AIRTEL_MONEY_BUSINESS_ID=
+
+SELCOM_PAYMENT_API_URL=
+SELCOM_PAYMENT_STATUS_URL=
+SELCOM_PAYMENT_API_KEY=
+SELCOM_PAYMENT_BUSINESS_ID=
+
+# Stripe Configuration (for credit card payments)
+STRIPE_SECRET_KEY=sk_test_xxxxx
+STRIPE_PUBLIC_KEY=pk_test_xxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxx
+STRIPE_PRICE_STARTER=price_xxxxx
+STRIPE_PRICE_PRO=price_xxxxx
+STRIPE_PRICE_ENTERPRISE=price_xxxxx
 ```
 
 ### 3. Start Development Server

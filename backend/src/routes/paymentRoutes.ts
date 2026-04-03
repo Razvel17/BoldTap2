@@ -1,8 +1,10 @@
-// Payment routes for mobile money collections and purchase history
+// Payment routes for mobile money collections, card payments, and purchase history
 
 import { Router } from "express";
 import { authenticate } from "../middleware/authMiddleware";
 import * as paymentService from "../services/paymentService";
+import * as paymentController from "../controllers/paymentController";
+import * as stripeWebhookService from "../services/stripeWebhookService";
 import { sendSuccess, sendError } from "../utils/errors";
 
 const router = Router();
@@ -116,6 +118,37 @@ router.post("/customer/intent", authenticate as any, async (req: any, res) => {
   }
 });
 
+// ==================== CARD PAYMENT ROUTES (Stripe) ====================
+
+// Create payment intent for card payment
+router.post("/card/intent", authenticate as any, paymentController.createPaymentIntent);
+
+// Process card payment
+router.post("/card/process", authenticate as any, paymentController.processCardPayment);
+
+// Confirm card payment with payment method
+router.post("/card/confirm", authenticate as any, paymentController.confirmCardPayment);
+
+// Save card for future use
+router.post("/card/save", authenticate as any, paymentController.savePaymentMethod);
+
+// Get saved payment methods
+router.get("/card/methods", authenticate as any, paymentController.getSavedPaymentMethods);
+
+// Delete saved payment method
+router.delete("/card/methods/:paymentMethodId", authenticate as any, paymentController.deletePaymentMethod);
+
+// Create subscription with card
+router.post("/card/subscribe", authenticate as any, paymentController.createCardSubscription);
+
+// Retry failed payment
+router.post("/card/retry", authenticate as any, paymentController.retryFailedPayment);
+
+// Get payment status (works for both mobile money and card)
+router.get("/:paymentIntentId/status", authenticate as any, paymentController.getPaymentStatus);
+
+// ==================== MERCHANT SUBSCRIPTION ROUTES ====================
+
 router.get("/merchant/subscription/plans", authenticate as any, async (_req: any, res) => {
   try {
     return sendSuccess(res, {
@@ -124,7 +157,7 @@ router.get("/merchant/subscription/plans", authenticate as any, async (_req: any
         { id: "pro", name: "Pro", price: 50000, currency: "TZS" },
         { id: "enterprise", name: "Enterprise", price: 0, currency: "TZS", contact: true },
       ],
-      message: "Use mobile money collection to charge for plans.",
+      message: "Use /api/payment/card/* for card payments or /api/payment/collect for mobile money.",
     });
   } catch (error) {
     return sendError(res, error as Error);
@@ -167,6 +200,32 @@ router.post("/webhook/:provider", async (req: any, res) => {
     }
 
     return sendSuccess(res, { received: true });
+  } catch (error) {
+    return sendError(res, error as Error);
+  }
+});
+
+// Stripe webhook endpoint (no auth needed, use raw body)
+router.post("/webhook/stripe", async (req: any, res) => {
+  try {
+    const signature = req.headers["stripe-signature"];
+
+    if (!signature) {
+      return sendError(res, "Missing stripe-signature header", 400);
+    }
+
+    // Get raw body for signature verification
+    const rawBody = req.rawBody || Buffer.from(JSON.stringify(req.body));
+
+    const event = stripeWebhookService.verifyStripeWebhookSignature(rawBody, signature);
+
+    if (!event) {
+      return sendError(res, "Invalid signature", 401);
+    }
+
+    const result = await stripeWebhookService.handleStripeWebhook(event);
+
+    return sendSuccess(res, { ...result, eventId: event.id });
   } catch (error) {
     return sendError(res, error as Error);
   }

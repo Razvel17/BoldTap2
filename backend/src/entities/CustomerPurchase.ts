@@ -3,8 +3,8 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { User } from "./User";
 
 export type PurchaseStatus = "pending" | "succeeded" | "failed" | "cancelled";
-export type ProductType = "nfc_card" | "ring" | "other";
-export type PaymentProvider = "mpesa" | "yas" | "airtel_money";
+export type ProductType = "nfc_card" | "ring" | "subscription" | "other";
+export type PaymentProvider = "mpesa" | "yas" | "airtel_money" | "stripe";
 
 @Entity("customer_purchases")
 export class CustomerPurchase {
