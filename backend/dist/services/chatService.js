@@ -1,8 +1,10 @@
 "use strict";
+// Chat Service
+// Handles conversation and message operations
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createConversation = createConversation;
-exports.getConversations = getConversations;
-exports.getConversationMessages = getConversationMessages;
+exports.listConversations = listConversations;
+exports.getMessages = getMessages;
 exports.sendMessage = sendMessage;
 exports.editMessage = editMessage;
 exports.deleteMessage = deleteMessage;
@@ -12,195 +14,122 @@ const database_1 = require("../config/database");
 const Conversation_1 = require("../entities/Conversation");
 const ChatMessage_1 = require("../entities/ChatMessage");
 const User_1 = require("../entities/User");
+const typeorm_1 = require("typeorm");
 const conversationRepo = () => database_1.AppDataSource.getRepository(Conversation_1.Conversation);
 const messageRepo = () => database_1.AppDataSource.getRepository(ChatMessage_1.ChatMessage);
 const userRepo = () => database_1.AppDataSource.getRepository(User_1.User);
-async function createConversation(createdBy, title, participantIds, description) {
-    try {
-        const participants = await userRepo().findByIds(participantIds);
-        const creator = await userRepo().findOneBy({ id: createdBy });
-        if (!creator) {
-            return { success: false, error: "Creator not found" };
-        }
-        const conversation = new Conversation_1.Conversation();
-        conversation.title = title;
-        conversation.description = description || "";
-        conversation.createdBy = createdBy;
-        conversation.participants = [creator, ...participants];
-        conversation.deletedAt = null;
-        const saved = await conversationRepo().save(conversation);
-        return { success: true, conversation: saved };
-    }
-    catch (error) {
-        return { success: false, error: error.message };
-    }
+async function createConversation(data) {
+    const participants = await userRepo().find({
+        where: { id: (0, typeorm_1.In)(data.participantIds) },
+    });
+    const conversation = conversationRepo().create({
+        title: data.title,
+        description: data.description,
+        participants,
+        createdBy: data.createdBy,
+    });
+    return await conversationRepo().save(conversation);
 }
-async function getConversations(userId) {
-    try {
-        const conversations = await conversationRepo()
-            .createQueryBuilder("conv")
-            .leftJoinAndSelect("conv.participants", "participants")
-            .leftJoinAndSelect("conv.messages", "messages")
-            .where("participants.id = :userId", { userId })
-            .andWhere("conv.deletedAt IS NULL")
-            .orderBy("conv.updatedAt", "DESC")
-            .take(50)
-            .getMany();
-        return { success: true, conversations };
-    }
-    catch (error) {
-        return { success: false, error: error.message };
-    }
+async function listConversations(userId) {
+    return conversationRepo()
+        .createQueryBuilder("c")
+        .leftJoinAndSelect("c.participants", "p")
+        .leftJoinAndSelect("c.messages", "m")
+        .where("p.id = :userId", { userId })
+        .orderBy("c.updatedAt", "DESC")
+        .take(50)
+        .getMany();
 }
-async function getConversationMessages(conversationId, userId, limit = 50, offset = 0) {
-    try {
-        // Verify user is participant
-        const conversation = await conversationRepo()
-            .createQueryBuilder("conv")
-            .leftJoinAndSelect("conv.participants", "participants")
-            .where("conv.id = :id", { id: conversationId })
-            .getOne();
-        if (!conversation) {
-            return { success: false, error: "Conversation not found" };
-        }
-        const isParticipant = conversation.participants.some((p) => p.id === userId);
-        if (!isParticipant) {
-            return { success: false, error: "Access denied" };
-        }
-        const messages = await messageRepo()
-            .createQueryBuilder("msg")
-            .leftJoinAndSelect("msg.sender", "sender")
-            .where("msg.conversationId = :convId", { convId: conversationId })
-            .andWhere("msg.deletedAt IS NULL")
-            .orderBy("msg.createdAt", "DESC")
-            .skip(offset)
-            .take(limit)
-            .getMany();
-        return { success: true, messages: messages.reverse() };
-    }
-    catch (error) {
-        return { success: false, error: error.message };
-    }
-}
-async function sendMessage(conversationId, senderId, content, type = "text", metadata) {
-    try {
-        // Verify user is participant
-        const conversation = await conversationRepo()
-            .createQueryBuilder("conv")
-            .leftJoinAndSelect("conv.participants", "participants")
-            .where("conv.id = :id", { id: conversationId })
-            .getOne();
-        if (!conversation) {
-            return { success: false, error: "Conversation not found" };
-        }
-        const isParticipant = conversation.participants.some((p) => p.id === senderId);
-        if (!isParticipant) {
-            return { success: false, error: "Not a participant" };
-        }
-        const message = messageRepo().create({
+async function getMessages(conversationId, limit = 50, offset = 0) {
+    return messageRepo()
+        .find({
+        where: {
             conversationId,
-            senderId,
-            content,
-            type,
-            metadata: metadata || null,
-        });
-        const saved = await messageRepo().save(message);
-        // Update conversation updatedAt
-        conversation.updatedAt = new Date();
-        await conversationRepo().save(conversation);
-        return { success: true, message: saved };
-    }
-    catch (error) {
-        return { success: false, error: error.message };
-    }
+            deletedAt: (0, typeorm_1.IsNull)(),
+        },
+        relations: ["sender"],
+        order: { createdAt: "ASC" },
+        skip: offset,
+        take: limit,
+    });
 }
-async function editMessage(messageId, userId, newContent) {
-    try {
-        const message = await messageRepo().findOneBy({ id: messageId });
-        if (!message) {
-            return { success: false, error: "Message not found" };
-        }
-        if (message.senderId !== userId) {
-            return { success: false, error: "Cannot edit other user's messages" };
-        }
-        message.content = newContent;
-        message.edited = true;
-        message.editedAt = new Date();
-        const updated = await messageRepo().save(message);
-        return { success: true, message: updated };
-    }
-    catch (error) {
-        return { success: false, error: error.message };
-    }
+async function sendMessage(data) {
+    const message = messageRepo().create({
+        conversationId: data.conversationId,
+        senderId: data.senderId,
+        content: data.content,
+        type: data.type,
+        metadata: data.metadata || null,
+    });
+    const saved = await messageRepo().save(message);
+    // Update conversation updatedAt
+    await conversationRepo().update(data.conversationId, {
+        updatedAt: new Date(),
+    });
+    return saved;
 }
-async function deleteMessage(messageId, userId) {
-    try {
-        const message = await messageRepo().findOneBy({ id: messageId });
-        if (!message) {
-            return { success: false, error: "Message not found" };
-        }
-        if (message.senderId !== userId) {
-            return { success: false, error: "Cannot delete other user's messages" };
-        }
-        // Soft delete
-        message.deletedAt = new Date();
-        await messageRepo().save(message);
-        return { success: true };
+async function editMessage(messageId, conversationId, userId, content) {
+    const message = await messageRepo().findOne({
+        where: { id: messageId, conversationId },
+    });
+    if (!message) {
+        throw new Error("Message not found");
     }
-    catch (error) {
-        return { success: false, error: error.message };
+    if (message.senderId !== userId) {
+        throw new Error("Not authorized to edit this message");
     }
+    message.content = content;
+    message.edited = true;
+    message.editedAt = new Date();
+    return await messageRepo().save(message);
+}
+async function deleteMessage(messageId, conversationId, userId) {
+    const message = await messageRepo().findOne({
+        where: { id: messageId, conversationId },
+    });
+    if (!message) {
+        throw new Error("Message not found");
+    }
+    if (message.senderId !== userId) {
+        throw new Error("Not authorized to delete this message");
+    }
+    await messageRepo().update(messageId, {
+        deletedAt: new Date(),
+    });
 }
 async function addParticipant(conversationId, userId, addedBy) {
-    try {
-        const conversation = await conversationRepo().findOneBy({
-            id: conversationId,
-        });
-        if (!conversation) {
-            return { success: false, error: "Conversation not found" };
-        }
-        const user = await userRepo().findOneBy({ id: userId });
-        if (!user) {
-            return { success: false, error: "User not found" };
-        }
-        // Verify addedBy is participant
-        const participants = await conversationRepo()
-            .createQueryBuilder("conv")
-            .leftJoinAndSelect("conv.participants", "participants")
-            .where("conv.id = :id", { id: conversationId })
-            .getOne();
-        const isParticipant = participants?.participants.some((p) => p.id === addedBy);
-        if (!isParticipant) {
-            return { success: false, error: "Access denied" };
-        }
-        conversation.participants = [...(participants?.participants || []), user];
-        const updated = await conversationRepo().save(conversation);
-        return { success: true, conversation: updated };
+    const conversation = await conversationRepo().findOne({
+        where: { id: conversationId },
+        relations: ["participants"],
+    });
+    if (!conversation) {
+        throw new Error("Conversation not found");
     }
-    catch (error) {
-        return { success: false, error: error.message };
+    // Check if user is in conversation
+    const isParticipant = conversation.participants.some((p) => p.id === addedBy);
+    if (!isParticipant) {
+        throw new Error("Not authorized");
     }
+    // Add new participant
+    const user = await userRepo().findOne({ where: { id: userId } });
+    if (!user) {
+        throw new Error("User not found");
+    }
+    if (!conversation.participants.find((p) => p.id === userId)) {
+        conversation.participants.push(user);
+        await conversationRepo().save(conversation);
+    }
+    return conversation;
 }
 async function leaveConversation(conversationId, userId) {
-    try {
-        const conversation = await conversationRepo()
-            .createQueryBuilder("conv")
-            .leftJoinAndSelect("conv.participants", "participants")
-            .where("conv.id = :id", { id: conversationId })
-            .getOne();
-        if (!conversation) {
-            return { success: false, error: "Conversation not found" };
-        }
-        conversation.participants = conversation.participants.filter((p) => p.id !== userId);
-        if (conversation.participants.length === 0) {
-            // Delete conversation if no participants left
-            conversation.deletedAt = new Date();
-        }
-        await conversationRepo().save(conversation);
-        return { success: true };
+    const conversation = await conversationRepo().findOne({
+        where: { id: conversationId },
+        relations: ["participants"],
+    });
+    if (!conversation) {
+        throw new Error("Conversation not found");
     }
-    catch (error) {
-        return { success: false, error: error.message };
-    }
+    conversation.participants = conversation.participants.filter((p) => p.id !== userId);
+    await conversationRepo().save(conversation);
 }
 //# sourceMappingURL=chatService.js.map

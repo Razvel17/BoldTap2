@@ -1,16 +1,20 @@
 "use strict";
 // Server entry point
-// Starts the Express application on the configured port
+// Starts the Express application on the configured port with WebSocket support
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.wsService = void 0;
 require("dotenv").config();
+const http_1 = require("http");
 const app_1 = __importDefault(require("./app"));
 const env_1 = require("./config/env");
 const db_1 = require("./config/db");
+const websocketService_1 = require("./services/websocketService");
 // Graceful shutdown
 let server;
+let wsService;
 async function gracefulShutdown(signal) {
     console.log(`\n${signal} received. Starting graceful shutdown...`);
     if (server) {
@@ -53,8 +57,12 @@ async function startServer() {
         // Initialize database first
         console.log("🔌 Connecting to database...");
         await (0, db_1.initializeDb)();
-        // Start Express server
-        server = app_1.default.listen(env_1.PORT, () => {
+        // Create HTTP server for Express + Socket.io
+        server = (0, http_1.createServer)(app_1.default);
+        // Initialize WebSocket service
+        exports.wsService = wsService = new websocketService_1.WebSocketService(server);
+        // Start server
+        server.listen(env_1.PORT, () => {
             console.log(`
 ╔════════════════════════════════════════╗
 ║                                        ║
@@ -65,6 +73,7 @@ async function startServer() {
 📍 Server:      ${env_1.BACKEND_URL}
 ⚙️  Environment: ${env_1.NODE_ENV}
 📦 Port:        ${env_1.PORT}
+🔌 WebSocket:   Enabled
 ⏱️  Started:     ${new Date().toLocaleString()}
 
 Ready to accept connections! 🚀

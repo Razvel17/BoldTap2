@@ -182,3 +182,78 @@ export async function leaveConversation(
     return sendError(res, error as Error);
   }
 }
+
+export async function searchMessages(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<Response | void> {
+  try {
+    const { conversationId } = req.params as { conversationId: string };
+    const { query, page } = req.query;
+
+    if (!query) {
+      return sendError(res, "Search query required", 400);
+    }
+
+    const messageSearchService = await import("../services/messageSearchService");
+    const result = await messageSearchService.searchMessages(
+      conversationId,
+      query as string,
+      parseInt(page as string) || 1,
+    );
+
+    return sendSuccess(res, result);
+  } catch (error) {
+    return sendError(res, error as Error);
+  }
+}
+
+export async function addReaction(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<Response | void> {
+  try {
+    const { conversationId, messageId } = req.params as {
+      conversationId: string;
+      messageId: string;
+    };
+    const { emoji } = req.body;
+
+    if (!emoji) {
+      return sendError(res, "Emoji required", 400);
+    }
+
+    const reactionService = await import("../services/reactionService");
+    const reaction = await reactionService.addReaction(
+      messageId,
+      req.user!.userId,
+      emoji,
+    );
+
+    return sendSuccess(res, reaction);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Reaction removed") {
+      return sendSuccess(res, { removed: true });
+    }
+    return sendError(res, error as Error);
+  }
+}
+
+export async function getReactions(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<Response | void> {
+  try {
+    const { messageId } = req.params as { messageId: string };
+
+    const reactionService = await import("../services/reactionService");
+    const reactions = await reactionService.getReactions(
+      messageId,
+      req.user?.userId,
+    );
+
+    return sendSuccess(res, { reactions });
+  } catch (error) {
+    return sendError(res, error as Error);
+  }
+}

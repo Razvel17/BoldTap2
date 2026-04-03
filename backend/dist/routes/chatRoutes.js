@@ -1,4 +1,6 @@
 "use strict";
+// Chat Routes
+// Routes for conversations and messaging
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -34,17 +36,24 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const authMiddleware_1 = require("../middleware/authMiddleware");
 const chatController = __importStar(require("../controllers/chatController"));
+const authMiddleware_1 = require("../middleware/authMiddleware");
 const router = (0, express_1.Router)();
-// All chat endpoints require authentication
+// Conversation endpoints
 router.post("/conversations", authMiddleware_1.authenticate, chatController.createConversation);
 router.get("/conversations", authMiddleware_1.authenticate, chatController.listConversations);
+// Message endpoints
 router.get("/conversations/:conversationId/messages", authMiddleware_1.authenticate, chatController.getMessages);
 router.post("/conversations/:conversationId/messages", authMiddleware_1.authenticate, chatController.sendMessage);
 router.put("/conversations/:conversationId/messages/:messageId", authMiddleware_1.authenticate, chatController.editMessage);
 router.delete("/conversations/:conversationId/messages/:messageId", authMiddleware_1.authenticate, chatController.deleteMessage);
+// Participant management
 router.post("/conversations/:conversationId/participants", authMiddleware_1.authenticate, chatController.addParticipant);
 router.delete("/conversations/:conversationId/leave", authMiddleware_1.authenticate, chatController.leaveConversation);
 exports.default = router;
+// Message search
+router.get("/conversations/:conversationId/search", authMiddleware_1.authenticate, chatController.searchMessages);
+// Reactions
+router.post("/conversations/:conversationId/messages/:messageId/reactions", authMiddleware_1.authenticate, chatController.addReaction);
+router.get("/messages/:messageId/reactions", authMiddleware_1.authenticate, chatController.getReactions);
 //# sourceMappingURL=chatRoutes.js.map

@@ -54,3 +54,22 @@ router.delete(
 );
 
 export default router;
+
+// Message search
+router.get(
+  "/conversations/:conversationId/search",
+  authenticate as any,
+  chatController.searchMessages as any,
+);
+
+// Reactions
+router.post(
+  "/conversations/:conversationId/messages/:messageId/reactions",
+  authenticate as any,
+  chatController.addReaction as any,
+);
+router.get(
+  "/messages/:messageId/reactions",
+  authenticate as any,
+  chatController.getReactions as any,
+);

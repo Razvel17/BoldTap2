@@ -1,4 +1,6 @@
 "use strict";
+// Chat Controller
+// Handles all chat-related endpoints for conversations and messages
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -41,19 +43,24 @@ exports.editMessage = editMessage;
 exports.deleteMessage = deleteMessage;
 exports.addParticipant = addParticipant;
 exports.leaveConversation = leaveConversation;
+exports.searchMessages = searchMessages;
+exports.addReaction = addReaction;
+exports.getReactions = getReactions;
 const chatService = __importStar(require("../services/chatService"));
 const errors_1 = require("../utils/errors");
 async function createConversation(req, res) {
     try {
         const { title, participantIds, description } = req.body;
         if (!title || !participantIds || !Array.isArray(participantIds)) {
-            return (0, errors_1.sendError)(res, "Title and participant IDs required", 400);
+            return (0, errors_1.sendError)(res, "Title and participant IDs array required", 400);
         }
-        const result = await chatService.createConversation(req.user.userId, title, participantIds, description);
-        if (!result.success) {
-            return (0, errors_1.sendError)(res, result.error || "Failed to create conversation", 400);
-        }
-        return (0, errors_1.sendSuccess)(res, { conversation: result.conversation });
+        const result = await chatService.createConversation({
+            title,
+            participantIds: [req.user.userId, ...participantIds],
+            description,
+            createdBy: req.user.userId,
+        });
+        return (0, errors_1.sendSuccess)(res, result);
     }
     catch (error) {
         return (0, errors_1.sendError)(res, error);
@@ -61,11 +68,8 @@ async function createConversation(req, res) {
 }
 async function listConversations(req, res) {
     try {
-        const result = await chatService.getConversations(req.user.userId);
-        if (!result.success) {
-            return (0, errors_1.sendError)(res, result.error || "Failed to fetch conversations", 400);
-        }
-        return (0, errors_1.sendSuccess)(res, { conversations: result.conversations });
+        const conversations = await chatService.listConversations(req.user.userId);
+        return (0, errors_1.sendSuccess)(res, { conversations });
     }
     catch (error) {
         return (0, errors_1.sendError)(res, error);
@@ -73,15 +77,11 @@ async function listConversations(req, res) {
 }
 async function getMessages(req, res) {
     try {
-        const conversationId = Array.isArray(req.params.conversationId)
-            ? req.params.conversationId[0]
-            : req.params.conversationId;
-        const { limit = 50, offset = 0 } = req.query;
-        const result = await chatService.getConversationMessages(conversationId, req.user.userId, Number(limit), Number(offset));
-        if (!result.success) {
-            return (0, errors_1.sendError)(res, result.error || "Failed to fetch messages", 400);
-        }
-        return (0, errors_1.sendSuccess)(res, { messages: result.messages });
+        const { conversationId } = req.params;
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+        const offset = parseInt(req.query.offset) || 0;
+        const messages = await chatService.getMessages(conversationId, limit, offset);
+        return (0, errors_1.sendSuccess)(res, { messages });
     }
     catch (error) {
         return (0, errors_1.sendError)(res, error);
@@ -89,18 +89,19 @@ async function getMessages(req, res) {
 }
 async function sendMessage(req, res) {
     try {
-        const conversationId = Array.isArray(req.params.conversationId)
-            ? req.params.conversationId[0]
-            : req.params.conversationId;
-        const { content, type = "text", metadata } = req.body;
+        const { conversationId } = req.params;
+        const { content, type, metadata } = req.body;
         if (!content) {
             return (0, errors_1.sendError)(res, "Message content required", 400);
         }
-        const result = await chatService.sendMessage(conversationId, req.user.userId, content, type, metadata);
-        if (!result.success) {
-            return (0, errors_1.sendError)(res, result.error || "Failed to send message", 400);
-        }
-        return (0, errors_1.sendSuccess)(res, { message: result.message });
+        const message = await chatService.sendMessage({
+            conversationId,
+            senderId: req.user.userId,
+            content,
+            type: type || "text",
+            metadata,
+        });
+        return (0, errors_1.sendSuccess)(res, message);
     }
     catch (error) {
         return (0, errors_1.sendError)(res, error);
@@ -108,18 +109,13 @@ async function sendMessage(req, res) {
 }
 async function editMessage(req, res) {
     try {
-        const messageId = Array.isArray(req.params.messageId)
-            ? req.params.messageId[0]
-            : req.params.messageId;
+        const { conversationId, messageId } = req.params;
         const { content } = req.body;
         if (!content) {
-            return (0, errors_1.sendError)(res, "Message content required", 400);
+            return (0, errors_1.sendError)(res, "Updated content required", 400);
         }
-        const result = await chatService.editMessage(messageId, req.user.userId, content);
-        if (!result.success) {
-            return (0, errors_1.sendError)(res, result.error || "Failed to edit message", 400);
-        }
-        return (0, errors_1.sendSuccess)(res, { message: result.message });
+        const message = await chatService.editMessage(messageId, conversationId, req.user.userId, content);
+        return (0, errors_1.sendSuccess)(res, message);
     }
     catch (error) {
         return (0, errors_1.sendError)(res, error);
@@ -127,13 +123,8 @@ async function editMessage(req, res) {
 }
 async function deleteMessage(req, res) {
     try {
-        const messageId = Array.isArray(req.params.messageId)
-            ? req.params.messageId[0]
-            : req.params.messageId;
-        const result = await chatService.deleteMessage(messageId, req.user.userId);
-        if (!result.success) {
-            return (0, errors_1.sendError)(res, result.error || "Failed to delete message", 400);
-        }
+        const { conversationId, messageId } = req.params;
+        await chatService.deleteMessage(messageId, conversationId, req.user.userId);
         return (0, errors_1.sendSuccess)(res, { message: "Message deleted" });
     }
     catch (error) {
@@ -142,18 +133,13 @@ async function deleteMessage(req, res) {
 }
 async function addParticipant(req, res) {
     try {
-        const conversationId = Array.isArray(req.params.conversationId)
-            ? req.params.conversationId[0]
-            : req.params.conversationId;
+        const { conversationId } = req.params;
         const { userId } = req.body;
         if (!userId) {
             return (0, errors_1.sendError)(res, "User ID required", 400);
         }
-        const result = await chatService.addParticipant(conversationId, userId, req.user.userId);
-        if (!result.success) {
-            return (0, errors_1.sendError)(res, result.error || "Failed to add participant", 400);
-        }
-        return (0, errors_1.sendSuccess)(res, { conversation: result.conversation });
+        const conversation = await chatService.addParticipant(conversationId, userId, req.user.userId);
+        return (0, errors_1.sendSuccess)(res, conversation);
     }
     catch (error) {
         return (0, errors_1.sendError)(res, error);
@@ -161,14 +147,53 @@ async function addParticipant(req, res) {
 }
 async function leaveConversation(req, res) {
     try {
-        const conversationId = Array.isArray(req.params.conversationId)
-            ? req.params.conversationId[0]
-            : req.params.conversationId;
-        const result = await chatService.leaveConversation(conversationId, req.user.userId);
-        if (!result.success) {
-            return (0, errors_1.sendError)(res, result.error || "Failed to leave conversation", 400);
-        }
+        const { conversationId } = req.params;
+        await chatService.leaveConversation(conversationId, req.user.userId);
         return (0, errors_1.sendSuccess)(res, { message: "Left conversation" });
+    }
+    catch (error) {
+        return (0, errors_1.sendError)(res, error);
+    }
+}
+async function searchMessages(req, res) {
+    try {
+        const { conversationId } = req.params;
+        const { query, page } = req.query;
+        if (!query) {
+            return (0, errors_1.sendError)(res, "Search query required", 400);
+        }
+        const messageSearchService = await Promise.resolve().then(() => __importStar(require("../services/messageSearchService")));
+        const result = await messageSearchService.searchMessages(conversationId, query, parseInt(page) || 1);
+        return (0, errors_1.sendSuccess)(res, result);
+    }
+    catch (error) {
+        return (0, errors_1.sendError)(res, error);
+    }
+}
+async function addReaction(req, res) {
+    try {
+        const { conversationId, messageId } = req.params;
+        const { emoji } = req.body;
+        if (!emoji) {
+            return (0, errors_1.sendError)(res, "Emoji required", 400);
+        }
+        const reactionService = await Promise.resolve().then(() => __importStar(require("../services/reactionService")));
+        const reaction = await reactionService.addReaction(messageId, req.user.userId, emoji);
+        return (0, errors_1.sendSuccess)(res, reaction);
+    }
+    catch (error) {
+        if (error instanceof Error && error.message === "Reaction removed") {
+            return (0, errors_1.sendSuccess)(res, { removed: true });
+        }
+        return (0, errors_1.sendError)(res, error);
+    }
+}
+async function getReactions(req, res) {
+    try {
+        const { messageId } = req.params;
+        const reactionService = await Promise.resolve().then(() => __importStar(require("../services/reactionService")));
+        const reactions = await reactionService.getReactions(messageId, req.user?.userId);
+        return (0, errors_1.sendSuccess)(res, { reactions });
     }
     catch (error) {
         return (0, errors_1.sendError)(res, error);
