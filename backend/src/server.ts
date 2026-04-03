@@ -5,16 +5,22 @@ require("dotenv").config();
 
 import app from "./app";
 import { PORT, NODE_ENV, BACKEND_URL } from "./config/env";
+import { initializeDb, cleanupDb } from "./config/db";
 
 // Graceful shutdown
 let server: any;
 
-function gracefulShutdown(signal: string) {
+async function gracefulShutdown(signal: string) {
   console.log(`\n${signal} received. Starting graceful shutdown...`);
 
   if (server) {
-    server.close(() => {
+    server.close(async () => {
       console.log("HTTP server closed");
+      try {
+        await cleanupDb();
+      } catch (error) {
+        console.error("Error closing database:", error);
+      }
       process.exit(0);
     });
 
@@ -46,9 +52,16 @@ process.on("unhandledRejection", (reason, promise) => {
   process.exit(1);
 });
 
-// Start server
-server = app.listen(PORT, () => {
-  console.log(`
+// Start server with async initialization
+async function startServer() {
+  try {
+    // Initialize database first
+    console.log("🔌 Connecting to database...");
+    await initializeDb();
+
+    // Start Express server
+    server = app.listen(PORT, () => {
+      console.log(`
 ╔════════════════════════════════════════╗
 ║                                        ║
 ║      BoldTap Backend Server Start      ║
@@ -62,6 +75,15 @@ server = app.listen(PORT, () => {
 
 Ready to accept connections! 🚀
   `);
-});
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 export default server;
+
+

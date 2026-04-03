@@ -281,8 +281,8 @@ export async function verifyToken(token: string): Promise<TokenData | null> {
   }
 }
 
-// Generate JWT token
-async function generateToken(data: TokenData): Promise<string> {
+// Generate JWT token (exported for use in other services)
+export async function generateTokenForExport(data: TokenData): Promise<string> {
   const { default: jwt } = await import("jsonwebtoken");
   return jwt.sign(
     data,
@@ -294,8 +294,14 @@ async function generateToken(data: TokenData): Promise<string> {
   );
 }
 
+// Generate JWT token
+async function generateToken(data: TokenData): Promise<string> {
+  return generateTokenForExport(data);
+}
+
 // Check if email exists
 export async function emailExists(email: string): Promise<boolean> {
   const user = await db.users.findByEmail(email);
   return !!user;
 }
+

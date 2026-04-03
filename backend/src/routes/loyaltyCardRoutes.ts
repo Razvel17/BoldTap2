@@ -8,19 +8,19 @@ import { authenticate } from "../middleware/authMiddleware";
 const router = Router();
 
 // Public endpoints
-router.get("/business/:slug", loyaltyController.getLoyaltyBusinessBySlug);
-router.get("/card/:cardId", loyaltyController.getLoyaltyCard);
+router.get("/business/:slug", loyaltyController.getLoyaltyBusinessBySlug as any);
+router.get("/card/:cardId", loyaltyController.getLoyaltyCard as any);
 
 // Protected endpoints (require authentication)
-router.post("/business", authenticate, loyaltyController.createLoyaltyBusiness);
-router.get("/user/businesses", authenticate, loyaltyController.getUserLoyaltyBusinesses);
-router.get("/user/cards", authenticate, loyaltyController.getUserLoyaltyCards);
-router.post("/card", authenticate, loyaltyController.createLoyaltyCard);
-router.post("/card/:cardId/points", authenticate, loyaltyController.addPointsToCard);
-router.put("/business/:businessId", authenticate, loyaltyController.updateLoyaltyBusiness);
-router.delete("/card/:cardId", authenticate, loyaltyController.deleteLoyaltyCard);
+router.post("/business", authenticate as any, loyaltyController.createLoyaltyBusiness as any);
+router.get("/user/businesses", authenticate as any, loyaltyController.getUserLoyaltyBusinesses as any);
+router.get("/user/cards", authenticate as any, loyaltyController.getUserLoyaltyCards as any);
+router.post("/card", authenticate as any, loyaltyController.createLoyaltyCard as any);
+router.post("/card/:cardId/points", authenticate as any, loyaltyController.addPointsToCard as any);
+router.put("/business/:businessId", authenticate as any, loyaltyController.updateLoyaltyBusiness as any);
+router.delete("/card/:cardId", authenticate as any, loyaltyController.deleteLoyaltyCard as any);
 
 // Admin endpoints
-router.get("/business/:businessId/cards", authenticate, loyaltyController.getBusinessLoyaltyCards);
+router.get("/business/:businessId/cards", authenticate as any, loyaltyController.getBusinessLoyaltyCards as any);
 
 export default router;

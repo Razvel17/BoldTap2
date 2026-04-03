@@ -8,13 +8,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv").config();
 const app_1 = __importDefault(require("./app"));
 const env_1 = require("./config/env");
+const db_1 = require("./config/db");
 // Graceful shutdown
 let server;
-function gracefulShutdown(signal) {
+async function gracefulShutdown(signal) {
     console.log(`\n${signal} received. Starting graceful shutdown...`);
     if (server) {
-        server.close(() => {
+        server.close(async () => {
             console.log("HTTP server closed");
+            try {
+                await (0, db_1.cleanupDb)();
+            }
+            catch (error) {
+                console.error("Error closing database:", error);
+            }
             process.exit(0);
         });
         // Force shutdown after 10 seconds
@@ -40,9 +47,15 @@ process.on("unhandledRejection", (reason, promise) => {
     console.error("Unhandled Rejection at:", promise, "reason:", reason);
     process.exit(1);
 });
-// Start server
-server = app_1.default.listen(env_1.PORT, () => {
-    console.log(`
+// Start server with async initialization
+async function startServer() {
+    try {
+        // Initialize database first
+        console.log("🔌 Connecting to database...");
+        await (0, db_1.initializeDb)();
+        // Start Express server
+        server = app_1.default.listen(env_1.PORT, () => {
+            console.log(`
 ╔════════════════════════════════════════╗
 ║                                        ║
 ║      BoldTap Backend Server Start      ║
@@ -56,6 +69,13 @@ server = app_1.default.listen(env_1.PORT, () => {
 
 Ready to accept connections! 🚀
   `);
-});
+        });
+    }
+    catch (error) {
+        console.error("Failed to start server:", error);
+        process.exit(1);
+    }
+}
+startServer();
 exports.default = server;
 //# sourceMappingURL=server.js.map

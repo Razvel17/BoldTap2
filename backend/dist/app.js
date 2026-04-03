@@ -5,16 +5,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+require("reflect-metadata"); // TypeORM requires this at the top
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const express_session_1 = __importDefault(require("express-session"));
+const passport_1 = __importDefault(require("passport"));
 const env_1 = require("./config/env");
 const errors_1 = require("./utils/errors");
+const passport_2 = __importDefault(require("./config/passport"));
 // Routes
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const loyaltyCardRoutes_1 = __importDefault(require("./routes/loyaltyCardRoutes"));
 const nfcBusinessRoutes_1 = __importDefault(require("./routes/nfcBusinessRoutes"));
+const paymentRoutes_1 = __importDefault(require("./routes/paymentRoutes"));
+const chatRoutes_1 = __importDefault(require("./routes/chatRoutes"));
 const app = (0, express_1.default)();
 // ============ SECURITY MIDDLEWARE ============
 // Security headers with helmet
@@ -90,6 +96,23 @@ app.use(express_1.default.urlencoded({
     extended: true,
     parameterLimit: 50, // Limit number of parameters
 }));
+// ============ SESSION & OAUTH MIDDLEWARE ============
+// Session middleware for OAuth
+app.use((0, express_session_1.default)({
+    secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: env_1.NODE_ENV === "production",
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+}));
+// Passport middleware
+passport_2.default;
+app.use(passport_1.default.initialize());
+app.use(passport_1.default.session());
 // ============ REQUEST LOGGING (DEV ONLY) ============
 if (env_1.NODE_ENV === "development") {
     app.use((req, _res, next) => {
@@ -114,6 +137,8 @@ app.get("/health", (_req, res) => {
 app.use("/auth", authLimiter, authRoutes_1.default);
 app.use("/api/loyalty", loyaltyCardRoutes_1.default);
 app.use("/api/nfc", nfcBusinessRoutes_1.default);
+app.use("/api/payments", paymentRoutes_1.default);
+app.use("/api/chat", chatRoutes_1.default);
 // ============ VERSION & INFO ENDPOINTS ============
 app.get("/version", (_req, res) => {
     res.json({
@@ -155,6 +180,16 @@ app.get("/api", (_req, res) => {
                 updateProfile: "PUT /api/nfc/profile/:profileId (requires authentication)",
                 deleteProfile: "DELETE /api/nfc/profile/:profileId (requires authentication)",
                 checkSlug: "GET /api/nfc/check-slug",
+            },
+            chat: {
+                createConversation: "POST /api/chat/conversations (requires authentication)",
+                listConversations: "GET /api/chat/conversations (requires authentication)",
+                getMessages: "GET /api/chat/conversations/:conversationId/messages (requires authentication)",
+                sendMessage: "POST /api/chat/conversations/:conversationId/messages (requires authentication)",
+                editMessage: "PUT /api/chat/conversations/:conversationId/messages/:messageId (requires authentication)",
+                deleteMessage: "DELETE /api/chat/conversations/:conversationId/messages/:messageId (requires authentication)",
+                addParticipant: "POST /api/chat/conversations/:conversationId/participants (requires authentication)",
+                leaveConversation: "DELETE /api/chat/conversations/:conversationId/leave (requires authentication)",
             },
         },
     });

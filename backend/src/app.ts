@@ -1,10 +1,13 @@
 // Express application setup
 // Configures middleware, CORS, routes, and error handling
 
+import "reflect-metadata"; // TypeORM requires this at the top
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import session from "express-session";
+import passport from "passport";
 import {
   FRONTEND_URL,
   NODE_ENV,
@@ -13,11 +16,14 @@ import {
   RATE_LIMIT_AUTH_MAX_REQUESTS,
 } from "./config/env";
 import { sendError } from "./utils/errors";
+import setupPassport from "./config/passport";
 
 // Routes
 import authRoutes from "./routes/authRoutes";
 import loyaltyCardRoutes from "./routes/loyaltyCardRoutes";
 import nfcBusinessRoutes from "./routes/nfcBusinessRoutes";
+import paymentRoutes from "./routes/paymentRoutes";
+import chatRoutes from "./routes/chatRoutes";
 
 const app = express();
 
@@ -109,6 +115,28 @@ app.use(
   }),
 );
 
+// ============ SESSION & OAUTH MIDDLEWARE ============
+
+// Session middleware for OAuth
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: NODE_ENV === "production",
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  }),
+);
+
+// Passport middleware
+setupPassport;
+app.use(passport.initialize());
+app.use(passport.session());
+
 // ============ REQUEST LOGGING (DEV ONLY) ============
 
 if (NODE_ENV === "development") {
@@ -140,6 +168,8 @@ app.get("/health", (_req: Request, res: Response) => {
 app.use("/auth", authLimiter, authRoutes);
 app.use("/api/loyalty", loyaltyCardRoutes);
 app.use("/api/nfc", nfcBusinessRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/chat", chatRoutes);
 
 // ============ VERSION & INFO ENDPOINTS ============
 
@@ -190,6 +220,24 @@ app.get("/api", (_req: Request, res: Response) => {
         deleteProfile:
           "DELETE /api/nfc/profile/:profileId (requires authentication)",
         checkSlug: "GET /api/nfc/check-slug",
+      },
+      chat: {
+        createConversation:
+          "POST /api/chat/conversations (requires authentication)",
+        listConversations:
+          "GET /api/chat/conversations (requires authentication)",
+        getMessages:
+          "GET /api/chat/conversations/:conversationId/messages (requires authentication)",
+        sendMessage:
+          "POST /api/chat/conversations/:conversationId/messages (requires authentication)",
+        editMessage:
+          "PUT /api/chat/conversations/:conversationId/messages/:messageId (requires authentication)",
+        deleteMessage:
+          "DELETE /api/chat/conversations/:conversationId/messages/:messageId (requires authentication)",
+        addParticipant:
+          "POST /api/chat/conversations/:conversationId/participants (requires authentication)",
+        leaveConversation:
+          "DELETE /api/chat/conversations/:conversationId/leave (requires authentication)",
       },
     },
   });

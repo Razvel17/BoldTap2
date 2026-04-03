@@ -41,6 +41,7 @@ exports.getUserById = getUserById;
 exports.updateProfile = updateProfile;
 exports.changePassword = changePassword;
 exports.verifyToken = verifyToken;
+exports.generateTokenForExport = generateTokenForExport;
 exports.emailExists = emailExists;
 const db_1 = require("../config/db");
 const env_1 = require("../config/env");
@@ -261,13 +262,17 @@ async function verifyToken(token) {
         return null;
     }
 }
-// Generate JWT token
-async function generateToken(data) {
+// Generate JWT token (exported for use in other services)
+async function generateTokenForExport(data) {
     const { default: jwt } = await Promise.resolve().then(() => __importStar(require("jsonwebtoken")));
     return jwt.sign(data, env_1.JWT_SECRET, {
         expiresIn: env_1.JWT_EXPIRES_IN,
         algorithm: env_1.JWT_ALGORITHM,
     });
+}
+// Generate JWT token
+async function generateToken(data) {
+    return generateTokenForExport(data);
 }
 // Check if email exists
 async function emailExists(email) {

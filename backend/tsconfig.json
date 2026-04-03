@@ -15,12 +15,16 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
 
+    // Decorators (required for TypeORM)
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
     // Strict Type Checking
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
-    "strictPropertyInitialization": true,
+    "strictPropertyInitialization": false,  // Relaxed for TypeORM entities
     "noImplicitThis": true,
     "alwaysStrict": true,
 

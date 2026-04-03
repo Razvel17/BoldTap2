@@ -35,6 +35,7 @@ export declare function changePassword(userId: string, oldPassword: string, newP
     error?: string;
 }>;
 export declare function verifyToken(token: string): Promise<TokenData | null>;
+export declare function generateTokenForExport(data: TokenData): Promise<string>;
 export declare function emailExists(email: string): Promise<boolean>;
 export {};
 //# sourceMappingURL=authServices.d.ts.map

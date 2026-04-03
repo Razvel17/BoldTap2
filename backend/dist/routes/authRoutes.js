@@ -43,9 +43,27 @@ const router = (0, express_1.Router)();
 router.post("/register", authController.register);
 router.post("/login", authController.login);
 router.post("/logout", authController.logout);
+router.post("/refresh", authController.refresh);
 router.get("/check-email", authController.checkEmailAvailability);
+// Email verification
+router.post("/verify-email/:token", authController.verifyEmail);
+// Password reset
+router.post("/forgot-password", authController.forgotPassword);
+router.post("/reset-password/:token", authController.resetPassword);
+// OAuth endpoints
+router.get("/google", (_req, res) => {
+    // Passport will handle this
+    res.json({ message: "Start Google OAuth flow" });
+});
+router.get("/google/callback", authController.googleCallback);
+router.get("/github", (_req, res) => {
+    // Passport will handle this
+    res.json({ message: "Start GitHub OAuth flow" });
+});
+router.get("/github/callback", authController.githubCallback);
 // Protected endpoints (require authentication)
 router.get("/me", authMiddleware_1.authenticate, authController.getCurrentUser);
+router.get("/me/info", authMiddleware_1.authenticate, authController.getCurrentUserInfo);
 router.put("/profile", authMiddleware_1.authenticate, authController.updateProfile);
 router.post("/change-password", authMiddleware_1.authenticate, authController.changePassword);
 exports.default = router;

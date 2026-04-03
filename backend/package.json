@@ -7,7 +7,10 @@
     "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "migrate": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d src/config/database.ts",
+    "migrate:revert": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d src/config/database.ts",
+    "migrate:generate": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate -d src/config/database.ts"
   },
   "keywords": [
     "nfc",
@@ -18,25 +21,37 @@
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
+    "@types/express-session": "^1.18.2",
+    "@types/passport-github2": "^1.2.9",
+    "@types/passport-google-oauth20": "^2.0.17",
     "bcrypt": "^6.0.0",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.3.2",
-    "helmet": "^8.1.0",
+    "express-rate-limit": "^7.5.0",
+    "express-session": "^1.19.0",
+    "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.3",
-    "uuid": "^13.0.0"
+    "passport": "^0.7.0",
+    "passport-github2": "^0.1.12",
+    "passport-google-oauth20": "^2.0.0",
+    "pg": "^8.20.0",
+    "reflect-metadata": "^0.2.2",
+    "stripe": "^22.0.0",
+    "typeorm": "^0.3.28",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
-    "@types/cors": "^2.8.19",
-    "@types/dotenv": "^8.2.3",
+    "@types/cors": "^2.8.17",
+    "@types/dotenv": "^6.1.1",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^25.5.0",
-    "@types/uuid": "^11.0.0",
+    "@types/node": "^20.10.6",
+    "@types/uuid": "^9.0.7",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.2"
+    "typescript": "^5.9.3"
   }
 }
