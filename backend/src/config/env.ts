@@ -16,12 +16,11 @@ const getDefaultJwtSecret = () => {
   return crypto.randomBytes(64).toString("hex");
 };
 
-export const JWT_SECRET =
-  process.env.JWT_SECRET || getDefaultJwtSecret();
+export const JWT_SECRET = process.env.JWT_SECRET || getDefaultJwtSecret();
 
 if (!JWT_SECRET) {
   throw new Error(
-    "JWT_SECRET environment variable is required. Set it in your .env file or generate one: openssl rand -hex 64"
+    "JWT_SECRET environment variable is required. Set it in your .env file or generate one: openssl rand -hex 64",
   );
 }
 
@@ -40,20 +39,20 @@ export const DATABASE_TYPE = process.env.DATABASE_TYPE || "in-memory";
 // Rate limiting configuration
 export const RATE_LIMIT_WINDOW_MS = parseInt(
   process.env.RATE_LIMIT_WINDOW_MS || "900000", // 15 minutes
-  10
+  10,
 );
 export const RATE_LIMIT_MAX_REQUESTS = parseInt(
   process.env.RATE_LIMIT_MAX_REQUESTS || "100",
-  10
+  10,
 );
 export const RATE_LIMIT_AUTH_MAX_REQUESTS = parseInt(
-  process.env.RATE_LIMIT_AUTH_MAX_REQUESTS || "5",
-  10
-);
+  process.env.RATE_LIMIT_AUTH_MAX_REQUESTS || "12",
+  10,
+); // increased from 5 to 12 to reduce false 'too many requests' on first-time registration
 
 // Validation
 if (NODE_ENV === "production" && !process.env.JWT_SECRET) {
   throw new Error(
-    "JWT_SECRET environment variable is required in production mode. Generate one: openssl rand -hex 64"
+    "JWT_SECRET environment variable is required in production mode. Generate one: openssl rand -hex 64",
   );
 }
